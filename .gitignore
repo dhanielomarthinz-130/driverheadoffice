@@ -1,0 +1,21 @@
+# Environment and config
+.env
+testsprite_tests/tmp/config.json
+.mcp.json
+
+# Scratch and temporary directories
+scratch/
+*.log
+*.tmp
+
+# Uploads directory (preserve folder, ignore user uploads)
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

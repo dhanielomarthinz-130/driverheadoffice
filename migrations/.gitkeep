@@ -1,0 +1,4 @@
+# Migrations folder
+# Put future incremental SQL migration files here, e.g.:
+# 001_initial_schema.sql
+# 002_add_new_columns.sql
