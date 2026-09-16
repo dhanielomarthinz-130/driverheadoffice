@@ -78,8 +78,8 @@ body {
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-    width: 268px;
-    min-width: 268px;
+    width: 272px;
+    min-width: 272px;
     background: var(--sidebar-bg-gradient);
     display: flex;
     flex-direction: column;
@@ -254,11 +254,11 @@ body {
 }
 
 .sidebar-brand-text small {
-    font-size: 0.68rem;
-    color: #64748b;
-    font-weight: 500;
-    margin-top: 2px;
-    letter-spacing: 0.04em;
+    font-size: 0.64rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-top: 3px;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
 }
 
@@ -719,7 +719,7 @@ body {
     position: fixed;
     top: 0;
     right: 0;
-    left: 268px;
+    left: 272px;
     /* Matches sidebar width */
     height: 60px;
     background: rgba(255, 255, 255, 0.85);

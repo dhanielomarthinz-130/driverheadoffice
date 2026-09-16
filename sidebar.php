@@ -52,7 +52,7 @@ $is_mgmt_open = (
         </div>
         <div class="sidebar-brand-text">
             <strong>T M S - Head Office</strong>
-            <small>Transportation Management</small>
+            <small>Transportation Management System</small>
         </div>
     </a>
 
@@ -131,9 +131,9 @@ $is_mgmt_open = (
                     <?php if (canAccessMenu('report_vehicles') || canAccessMenu('vehicles') || $role === 'admin' || $role === 'controller'): ?>
                         <a href="report_vehicles"
                             class="nav-link <?php echo ($current_page == 'report_vehicles.php') ? 'active' : ''; ?>"
-                            data-tooltip="Report Pakai & Lepas Mobil">
+                            data-tooltip="Pakai & Lepas Mobil">
                             <span class="material-symbols-outlined nav-icon">directions_car</span>
-                            <span class="nav-text">Report Pakai & Lepas Mobil</span>
+                            <span class="nav-text">Pakai & Lepas Mobil</span>
                         </a>
                     <?php endif; ?>
                 </div>
