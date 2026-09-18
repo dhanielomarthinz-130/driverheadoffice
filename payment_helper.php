@@ -74,9 +74,11 @@ function verifyPaymentProofWithAI($fullFilePath, $expectedAmount, $expectedMonth
     // Check if Gemini API key is configured
     $apiKey = '';
     try {
-        $stmtKey = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'gemini_api_key'");
-        $apiKey = $stmtKey ? trim((string)$stmtKey->fetchColumn()) : '';
-    } catch (Exception $e) {}
+        if ($pdo) {
+            $stmtKey = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'gemini_api_key'");
+            $apiKey = $stmtKey ? trim((string)$stmtKey->fetchColumn()) : '';
+        }
+    } catch (Throwable $e) {}
 
     // 1. Try Gemini Vision API if key exists
     if (!empty($apiKey)) {

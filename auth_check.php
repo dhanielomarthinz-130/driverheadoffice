@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
     if (isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) === 'on') {
         @ini_set('session.cookie_secure', '1');
     }
-    session_start();
+    @session_start();
 }
 
 // Generate session-bound CSRF token if not already generated
