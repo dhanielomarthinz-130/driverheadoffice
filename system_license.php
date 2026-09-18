@@ -459,9 +459,9 @@ $current_page = 'system_license.php';
                             <input type="email" id="cfgAdminEmail" name="payment_admin_email" class="form-control" placeholder="dhanielo.marthinz@gmail.com" required>
                         </div>
 
-                        <button type="submit" id="btnSavePaymentConfig" class="btn-submit-main">
-                            <span class="material-symbols-outlined">save</span>
-                            Simpan Rekening & Harga
+                        <button type="submit" id="btnSavePaymentConfig" class="btn-submit-main" style="width: 100%; height: 44px; padding: 0 12px; font-size: 0.88rem; font-weight: 700; border-radius: 10px; margin-top: 6px;">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">save</span>
+                            <span>Simpan Rekening & Harga</span>
                         </button>
                     </form>
                 </div>
@@ -474,65 +474,74 @@ $current_page = 'system_license.php';
                     </div>
 
                     <form id="aiSmtpForm">
-                        <div class="form-group">
-                            <label for="cfgGeminiKey">Google Gemini API Key (Verifikasi Struk AI)</label>
-                            <input type="password" id="cfgGeminiKey" name="gemini_api_key" class="form-control" placeholder="AIzaSy...">
-                            <small style="color: var(--text-sub); font-size: 0.75rem; margin-top: 4px; display: block;">
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label for="cfgGeminiKey" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span>Google Gemini API Key (Verifikasi Struk AI)</span>
+                                <span style="font-size: 0.68rem; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 6px;">Opsional</span>
+                            </label>
+                            <input type="password" id="cfgGeminiKey" name="gemini_api_key" class="form-control" placeholder="AIzaSy..." style="height: 42px;">
+                            <small style="color: var(--text-sub); font-size: 0.74rem; margin-top: 4px; display: block;">
                                 Digunakan untuk memeriksa keaslian foto struk m-banking / ATM secara otomatis. Kosongkan jika ingin memakai heuristik bawaan.
                             </small>
                         </div>
 
-                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-heading); margin-top: 1rem; margin-bottom: 6px;">
-                            Konfigurasi SMTP Pengiriman Email (Gmail / Mail Server):
+                        <div style="border-top: 1px dashed var(--border); margin: 1.25rem 0 1rem 0;"></div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 700; font-size: 0.84rem; color: var(--text-heading);">Konfigurasi SMTP Pengiriman Email:</span>
+                            <span style="font-size: 0.68rem; font-weight: 700; background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 6px;">Direkomendasikan</span>
                         </div>
                         
-                        <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.74rem; color: #cbd5e1; line-height: 1.5;">
-                            <strong style="color: #38bdf8; display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
-                                <span class="material-symbols-outlined" style="font-size: 15px;">info</span>
-                                PENTING: Pengaturan Akun Gmail
-                            </strong>
-                            Hosting website memblokir fungsi <code>mail()</code> biasa. Agar bukti transfer &amp; token lisensi dapat terkirim, gunakan SMTP Gmail:<br>
-                            1. Host: <code>smtp.gmail.com</code> | Port: <code>587</code> (TLS) atau <code>465</code> (SSL).<br>
-                            2. <strong>Password SMTP WAJIB memakai Sandi Aplikasi (16 digit)</strong>, bukan password login biasa Anda.<br>
-                            3. Buat sandi aplikasi di: <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline; font-weight: 700;">Google Account &gt; Keamanan &gt; Sandi Aplikasi</a>.
+                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #16a34a; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.77rem; line-height: 1.55;">
+                            <div style="font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-size: 0.8rem;">
+                                <span class="material-symbols-outlined" style="font-size: 17px; color: #16a34a;">verified</span>
+                                Panduan Pengiriman Email via Gmail SMTP:
+                            </div>
+                            <div style="color: #334155; font-size: 0.75rem;">
+                                Agar notifikasi bukti transfer &amp; email token aktivasi terkirim otomatis:<br>
+                                &bull; <strong>Host</strong>: <code>smtp.gmail.com</code> | <strong>Port</strong>: <code>587</code> (TLS) atau <code>465</code> (SSL)<br>
+                                &bull; <strong>Password</strong>: WAJIB gunakan <strong>16-Digit Sandi Aplikasi (App Password)</strong> Google, bukan password login biasa Anda.<br>
+                                &bull; Buka: <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style="color: #0284c7; font-weight: 700; text-decoration: underline;">myaccount.google.com/apppasswords</a>
+                            </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
-                            <div class="form-group">
-                                <label style="font-size: 0.75rem;">SMTP Host</label>
-                                <input type="text" id="cfgSmtpHost" name="smtp_host" class="form-control" placeholder="smtp.gmail.com">
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1.1fr; gap: 10px; margin-bottom: 12px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.75rem; margin-bottom: 4px;">SMTP Host</label>
+                                <input type="text" id="cfgSmtpHost" name="smtp_host" class="form-control" placeholder="smtp.gmail.com" style="height: 42px;">
                             </div>
-                            <div class="form-group">
-                                <label style="font-size: 0.75rem;">Port</label>
-                                <input type="number" id="cfgSmtpPort" name="smtp_port" class="form-control" placeholder="587">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.75rem; margin-bottom: 4px;">Port</label>
+                                <input type="number" id="cfgSmtpPort" name="smtp_port" class="form-control" placeholder="587" style="height: 42px;">
                             </div>
-                            <div class="form-group">
-                                <label style="font-size: 0.75rem;">Keamanan</label>
-                                <select id="cfgSmtpSecure" name="smtp_secure" class="form-control">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.75rem; margin-bottom: 4px;">Keamanan</label>
+                                <select id="cfgSmtpSecure" name="smtp_secure" class="form-control" style="height: 42px; padding: 0 10px; cursor: pointer;">
                                     <option value="tls">TLS</option>
                                     <option value="ssl">SSL</option>
                                 </select>
                             </div>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <div class="form-group">
-                                <label style="font-size: 0.75rem;">Username / Email SMTP</label>
-                                <input type="text" id="cfgSmtpUser" name="smtp_user" class="form-control" placeholder="user@gmail.com">
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.75rem; margin-bottom: 4px;">Username / Email SMTP</label>
+                                <input type="text" id="cfgSmtpUser" name="smtp_user" class="form-control" placeholder="user@gmail.com" style="height: 42px;">
                             </div>
-                            <div class="form-group">
-                                <label style="font-size: 0.75rem;">Password / 16-Digit App Password</label>
-                                <input type="password" id="cfgSmtpPass" name="smtp_pass" class="form-control" placeholder="••••••••••••••••">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.75rem; margin-bottom: 4px;">Password (16-Digit App Password)</label>
+                                <input type="password" id="cfgSmtpPass" name="smtp_pass" class="form-control" placeholder="••••••••••••••••" style="height: 42px;">
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 8px; margin-top: 4px;">
-                            <button type="submit" id="btnSaveAiSmtp" class="btn-submit-main" style="flex: 1; background: linear-gradient(135deg, #0284c7, #0369a1);">
-                                <span class="material-symbols-outlined">save</span>
-                                Simpan Pengaturan AI & Email
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+                            <button type="submit" id="btnSaveAiSmtp" class="btn-submit-main" style="width: 100%; height: 44px; padding: 0 12px; background: linear-gradient(135deg, #0284c7, #0369a1); font-size: 0.85rem; font-weight: 700; border-radius: 10px; margin: 0;">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">save</span>
+                                <span>Simpan Pengaturan</span>
                             </button>
-                            <button type="button" id="btnTestSmtp" class="btn-submit-main" style="flex: 0 0 auto; background: linear-gradient(135deg, #10b981, #059669); padding: 0 14px;" title="Uji coba kirim email sekarang">
-                                <span class="material-symbols-outlined">send</span>
-                                Uji Kirim Email
+                            <button type="button" id="btnTestSmtp" class="btn-submit-main" style="width: 100%; height: 44px; padding: 0 12px; background: linear-gradient(135deg, #10b981, #059669); font-size: 0.85rem; font-weight: 700; border-radius: 10px; margin: 0;" title="Uji coba kirim email sekarang">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">send</span>
+                                <span>Uji Kirim Email</span>
                             </button>
                         </div>
                     </form>
@@ -1277,7 +1286,7 @@ $current_page = 'system_license.php';
                 showToast('Terjadi gangguan jaringan', 'error');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined">save</span> Simpan Pengaturan AI & Email';
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Simpan Pengaturan</span>';
             }
         };
 
@@ -1299,7 +1308,7 @@ $current_page = 'system_license.php';
             btnTest.onclick = async () => {
                 const form = document.getElementById('aiSmtpForm');
                 btnTest.disabled = true;
-                btnTest.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite;">progress_activity</span> Menguji...';
+                btnTest.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite; font-size:18px;">progress_activity</span><span>Menguji...</span>';
 
                 try {
                     // Auto-save settings first so test runs against latest credentials
@@ -1323,7 +1332,7 @@ $current_page = 'system_license.php';
                     showToast('Terjadi gangguan koneksi ke server saat menguji SMTP', 'error');
                 } finally {
                     btnTest.disabled = false;
-                    btnTest.innerHTML = '<span class="material-symbols-outlined">send</span> Uji Kirim Email';
+                    btnTest.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">send</span><span>Uji Kirim Email</span>';
                 }
             };
         }
