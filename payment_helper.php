@@ -340,7 +340,7 @@ function sendSocketSMTP($toEmail, $subject, $htmlBody, $config, &$errorDetail = 
     $port = (int)($config['port'] ?: 587);
     $user = trim($config['user']);
     $pass = trim($config['pass']);
-    $secure = strtolower($config['secure'] ?: ($port === 465 ? 'ssl' : 'tls'));
+    $secure = strtolower(!empty($config['secure']) ? $config['secure'] : ($port === 465 ? 'ssl' : 'tls'));
 
     if (empty($host) || empty($user)) {
         $errorDetail = 'Host dan User SMTP wajib diisi.';
