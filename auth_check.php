@@ -189,6 +189,10 @@ function ensureLicenseTablesExist($pdo) {
             @$pdo->exec("ALTER TABLE `system_license_tokens` MODIFY COLUMN `status` VARCHAR(20) DEFAULT 'pending'");
         } catch (Exception $e) {}
 
+        try {
+            @$pdo->exec("ALTER TABLE `system_license_tokens` ADD COLUMN `user_phone` VARCHAR(30) NULL AFTER `user_email`");
+        } catch (Exception $e) {}
+
         $checked = true;
     } catch (Exception $e) {}
 }

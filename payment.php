@@ -713,11 +713,16 @@ $basePrice = $config['price_per_month'] ?: 150000;
                     </div>
 
                     <div class="form-group">
-                        <label for="userEmail">Email Anda (Untuk Menerima Token Aktivasi Lisensi):</label>
+                        <label for="userEmail">Email Anda (Untuk Data Lisensi):</label>
                         <input type="email" id="userEmail" name="email" class="form-control" placeholder="nama@perusahaan.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="userPhone">Nomor WhatsApp Anda (Untuk Konfirmasi & Terima Token):</label>
+                        <input type="tel" id="userPhone" name="phone" class="form-control" placeholder="08xxxxxxxxxx" required>
                         <small style="color: var(--text-sub); font-size: 0.76rem; margin-top: 5px; display: block;">
-                            <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: -2px; color: var(--accent);">mark_email_read</span>
-                            Token aktivasi lisensi sistem akan otomatis dikirimkan ke alamat email ini setelah diverifikasi.
+                            <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: -2px; color: #25D366;">chat</span>
+                            Admin akan mengirimkan Token Aktivasi langsung ke nomor WhatsApp ini setelah diverifikasi.
                         </small>
                     </div>
 
@@ -783,8 +788,12 @@ $basePrice = $config['price_per_month'] ?: 150000;
                     <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">MENUNGGU PERSETUJUAN ADMIN</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); padding-bottom: 6px;">
-                    <span style="color: var(--text-sub);">Email Penerima Token:</span>
+                    <span style="color: var(--text-sub);">Email Pembeli:</span>
                     <span id="modalEmailText" style="color: #ffffff; font-weight: 700;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); padding-bottom: 6px;">
+                    <span style="color: var(--text-sub);">WhatsApp Pembeli:</span>
+                    <span id="modalPhoneText" style="color: #34d399; font-weight: 700;">-</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: var(--text-sub);">Paket Pilihan:</span>
@@ -928,14 +937,26 @@ $basePrice = $config['price_per_month'] ?: 150000;
 
                 if (data.success) {
                     document.getElementById('modalEmailText').textContent = data.email;
+                    document.getElementById('modalPhoneText').textContent = data.phone || '-';
                     document.getElementById('modalPackageText').textContent = `${data.months} Bulan (Rp ${Number(data.amount).toLocaleString('id-ID')})`;
                     document.getElementById('successSummary').innerHTML = `
-                        Laporan bukti transfer untuk paket <strong>${data.months} Bulan</strong> telah berhasil dikirimkan ke Admin.<br>
-                        Admin akan segera memeriksa bukti transfer dan menerbitkan Token Lisensi ke email Anda (<strong>${data.email}</strong>).
+                        Bukti pembayaran untuk paket <strong>${data.months} Bulan</strong> telah diunggah.<br>
+                        Silakan klik tombol hijau di bawah untuk <strong>kirim bukti transfer langsung ke WhatsApp Admin</strong> agar segera diverifikasi dan diberikan Token Lisensi.
                     `;
 
-                    // Pre-fill WhatsApp confirmation message
-                    const waText = encodeURIComponent(`Halo Admin TMS, saya baru saja transfer dan submit bukti pembayaran lisensi TMS paket ${data.months} Bulan (Rp ${Number(data.amount).toLocaleString('id-ID')}) dengan email: ${data.email}. Mohon dicek dan dikirimkan token aktivasinya.`);
+                    // Pre-fill WhatsApp confirmation message including proof URL and details
+                    const proofUrl = data.proof_url || '';
+                    const waLines = [
+                        `Halo Admin TMS, saya ingin konfirmasi pembayaran lisensi sistem TMS:`,
+                        ``,
+                        `• Paket: ${data.months} Bulan (Rp ${Number(data.amount).toLocaleString('id-ID')})`,
+                        `• Email: ${data.email}`,
+                        `• WhatsApp: ${data.phone || '-'}`,
+                        proofUrl ? `• Link Bukti Transfer:\n${proofUrl}` : ``,
+                        ``,
+                        `Mohon dicek dan dikirimkan Token Aktivasi lisensi sistem. Terima kasih!`
+                    ];
+                    const waText = encodeURIComponent(waLines.filter(Boolean).join('\n'));
                     document.getElementById('btnWaConfirm').href = `https://wa.me/62822107031118?text=${waText}`;
 
                     document.getElementById('successModal').classList.add('active');

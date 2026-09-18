@@ -3909,10 +3909,14 @@ switch ($action) {
 
             // Generate Temporary Pending Reference Code (real token generated when Admin approves)
             $pendingToken = 'PENDING-' . strtoupper(bin2hex(random_bytes(5)));
+            $phone = trim($_POST['phone'] ?? '');
 
-            $stmtToken = $pdo->prepare("INSERT INTO system_license_tokens (token, months, user_email, amount, payment_proof, ai_status, ai_analysis, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
-            $stmtToken->execute([$pendingToken, $months, $email, $totalAmount, $fileName, $aiStatus, $aiAnalysisJson]);
+            $stmtToken = $pdo->prepare("INSERT INTO system_license_tokens (token, months, user_email, user_phone, amount, payment_proof, ai_status, ai_analysis, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+            $stmtToken->execute([$pendingToken, $months, $email, $phone, $totalAmount, $fileName, $aiStatus, $aiAnalysisJson]);
             $insertedId = $pdo->lastInsertId();
+
+            $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+            $proofUrl = $baseUrl . "/uploads/payments/" . urlencode($fileName);
 
             // Dispatch Report to Administrator Only
             $mailToAdminError = '';
@@ -3923,11 +3927,14 @@ switch ($action) {
             echo json_encode([
                 'success' => true,
                 'status' => 'pending',
-                'message' => 'Bukti transfer berhasil dikirimkan! Laporan telah diteruskan ke Admin untuk diverifikasi. Token aktivasi akan segera dibuatkan dan dikirimkan ke email Anda.',
+                'message' => 'Bukti transfer berhasil dikirimkan! Silakan konfirmasi via WhatsApp ke Admin untuk menerima Token Aktivasi.',
                 'id' => $insertedId,
                 'months' => $months,
                 'email' => $email,
+                'phone' => $phone,
                 'amount' => $totalAmount,
+                'proof_url' => $proofUrl,
+                'file_name' => $fileName,
                 'ai_status' => $aiStatus,
                 'ai_summary' => $aiResult['summary'] ?? 'Menunggu Verifikasi Admin',
                 'confidence' => $aiResult['confidence'] ?? 0.8,
@@ -4020,7 +4027,7 @@ switch ($action) {
             die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
         }
         try {
-            $stmt = $pdo->query("SELECT id, token, months, user_email, amount, payment_proof, ai_status, ai_analysis, status, created_at, used_at FROM system_license_tokens ORDER BY id DESC LIMIT 50");
+            $stmt = $pdo->query("SELECT id, token, months, user_email, user_phone, amount, payment_proof, ai_status, ai_analysis, status, created_at, used_at FROM system_license_tokens ORDER BY id DESC LIMIT 50");
             $tokens = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
             echo json_encode([
                 'success' => true,
@@ -4069,17 +4076,13 @@ switch ($action) {
             logActivity('PAYMENT_APPROVED', "Admin {$adminName} menyetujui transaksi #{$id}. Token {$newToken} diterbitkan untuk {$row['user_email']}.");
 
             $msg = "Pembayaran disetujui! Token {$newToken} berhasil diterbitkan.";
-            if ($mailSent) {
-                $msg .= " Email aktivasi telah dikirimkan ke {$row['user_email']}.";
-            } else {
-                $msg .= " Namun email otomatis gagal terkirim ({$mailErr}). Anda dapat membagikan token langsung via WhatsApp.";
-            }
 
             echo json_encode([
                 'success' => true,
                 'message' => $msg,
                 'token' => $newToken,
                 'email' => $row['user_email'],
+                'phone' => $row['user_phone'] ?? '',
                 'months' => $row['months'],
                 'amount' => $row['amount'],
                 'mail_sent' => $mailSent,

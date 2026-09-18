@@ -321,7 +321,7 @@ $initialToken = trim($_GET['token'] ?? '');
                 <span>Sudah Melakukan Pembayaran? Masukkan Token:</span>
             </div>
             <p class="token-sub">
-                Salin kode Token Lisensi yang telah dikirimkan ke email Anda setelah verifikasi bukti transfer:
+                Salin kode Token Lisensi yang telah Anda terima setelah verifikasi bukti transfer:
             </p>
 
             <form id="tokenForm">
@@ -348,7 +348,6 @@ $initialToken = trim($_GET['token'] ?? '');
             <ul>
                 <li>Seluruh data penugasan, master lokasi, armada, dan user tetap aman tersimpan.</li>
                 <li>Setelah token diaktivasi, sistem otomatis terbuka tanpa perlu instalasi ulang.</li>
-                <li>Butuh bantuan atau pertanyaan perpanjangan? Hubungi email <strong>dhanielo.marthinz@gmail.com</strong></li>
             </ul>
         </div>
 
