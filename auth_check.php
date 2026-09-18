@@ -176,8 +176,13 @@ function ensureLicenseTablesExist($pdo) {
             ('payment_account_number', '1234567890'),
             ('payment_account_holder', 'Dhanielo Marthinz'),
             ('payment_price_per_month', '150000'),
-            ('payment_admin_email', 'dhanielo.marthinz@gmail.com')
-            ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
+            ('payment_admin_email', 'dhanielo.marthinz@gmail.com'),
+            ('smtp_host', 'smtp.gmail.com'),
+            ('smtp_port', '587'),
+            ('smtp_secure', 'tls'),
+            ('smtp_user', 'dhanielo.marthinz@gmail.com'),
+            ('smtp_pass', 'kvyorenuxtrygrxb')
+            ON DUPLICATE KEY UPDATE `setting_value` = IF(`setting_value` IS NULL OR `setting_value` = '' OR `setting_value` = 'Dh@niel0130592', VALUES(`setting_value`), `setting_value`);
         ");
 
         try {

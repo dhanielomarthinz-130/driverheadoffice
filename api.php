@@ -3808,10 +3808,10 @@ switch ($action) {
                 'price_per_month' => 150000,
                 'admin_email' => 'dhanielo.marthinz@gmail.com',
                 'has_gemini' => false,
-                'smtp_host' => '',
+                'smtp_host' => 'smtp.gmail.com',
                 'smtp_port' => '587',
-                'smtp_user' => '',
-                'smtp_pass' => '',
+                'smtp_user' => 'dhanielo.marthinz@gmail.com',
+                'smtp_pass' => 'kvyorenuxtrygrxb',
                 'smtp_secure' => 'tls'
             ];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -3824,11 +3824,13 @@ switch ($action) {
                     $config['has_gemini'] = !empty(trim((string)$row['setting_value']));
                     $config['gemini_api_key'] = $row['setting_value'];
                 }
-                if ($row['setting_key'] === 'smtp_host') $config['smtp_host'] = $row['setting_value'];
-                if ($row['setting_key'] === 'smtp_port') $config['smtp_port'] = $row['setting_value'];
-                if ($row['setting_key'] === 'smtp_user') $config['smtp_user'] = $row['setting_value'];
-                if ($row['setting_key'] === 'smtp_pass') $config['smtp_pass'] = $row['setting_value'];
-                if ($row['setting_key'] === 'smtp_secure') $config['smtp_secure'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_host' && !empty($row['setting_value'])) $config['smtp_host'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_port' && !empty($row['setting_value'])) $config['smtp_port'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_user' && !empty($row['setting_value'])) $config['smtp_user'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_pass' && !empty($row['setting_value'])) {
+                    $config['smtp_pass'] = ($row['setting_value'] === 'Dh@niel0130592') ? 'kvyorenuxtrygrxb' : $row['setting_value'];
+                }
+                if ($row['setting_key'] === 'smtp_secure' && !empty($row['setting_value'])) $config['smtp_secure'] = $row['setting_value'];
             }
 
             // Pricing packages

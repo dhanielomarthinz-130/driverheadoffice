@@ -1156,10 +1156,13 @@ $current_page = 'system_license.php';
                     showToast(data.message, 'success');
                     lastGeneratedToken = data.token;
                     document.getElementById('tokenResultCode').textContent = data.token;
-                    document.getElementById('tokenResultDesc').innerHTML = `
-                        Token lisensi (<strong>${data.months} Bulan</strong>) telah berhasil diterbitkan!<br>
-                        Email aktivasi otomatis dikirimkan ke: <strong>${data.email}</strong>.
-                    `;
+                    let descHtml = `Token lisensi (<strong>${data.months} Bulan</strong>) telah berhasil diterbitkan!<br>`;
+                    if (data.mail_sent) {
+                        descHtml += `<span style="color:#34d399;">✓ Email aktivasi berhasil dikirimkan ke: <strong>${data.email}</strong></span>`;
+                    } else {
+                        descHtml += `<span style="color:#fbbf24;">⚠ Catatan Email: ${data.mail_error || 'Email belum terkirim'}. Silakan klik tombol WhatsApp di bawah untuk kirim token ke pembeli.</span>`;
+                    }
+                    document.getElementById('tokenResultDesc').innerHTML = descHtml;
 
                     const waText = encodeURIComponent(`Halo, pembayaran lisensi TMS Anda (${data.months} Bulan) telah disetujui! Berikut adalah Token Aktivasi Anda:\n\n*${data.token}*\n\nSilakan masukkan token ini pada halaman sistem untuk mengaktifkan kembali.`);
                     document.getElementById('btnShareWa').href = `https://wa.me/?text=${waText}`;

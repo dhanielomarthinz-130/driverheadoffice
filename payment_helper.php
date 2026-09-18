@@ -249,12 +249,12 @@ function analyzeReceiptHeuristics($filePath, $expectedAmount, $expectedMonths) {
  * Universal Mail Dispatcher (SMTP with fallback to PHP mail() and DB audit logging)
  */
 function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null, &$lastError = null) {
-    // 1. Get SMTP Configuration from system_settings if available
+    // 1. Get SMTP Configuration from system_settings with reliable fallback defaults
     $smtpConfig = [
-        'host' => '',
+        'host' => 'smtp.gmail.com',
         'port' => 587,
-        'user' => '',
-        'pass' => '',
+        'user' => 'dhanielo.marthinz@gmail.com',
+        'pass' => 'kvyorenuxtrygrxb',
         'secure' => 'tls'
     ];
 
@@ -262,11 +262,15 @@ function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null, &$lastError
         try {
             $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure')");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                if ($row['setting_key'] === 'smtp_host') $smtpConfig['host'] = trim((string)$row['setting_value']);
-                if ($row['setting_key'] === 'smtp_port') $smtpConfig['port'] = (int)$row['setting_value'];
-                if ($row['setting_key'] === 'smtp_user') $smtpConfig['user'] = trim((string)$row['setting_value']);
-                if ($row['setting_key'] === 'smtp_pass') $smtpConfig['pass'] = trim((string)$row['setting_value']);
-                if ($row['setting_key'] === 'smtp_secure') $smtpConfig['secure'] = trim((string)$row['setting_value']);
+                $val = trim((string)$row['setting_value']);
+                if ($row['setting_key'] === 'smtp_host' && !empty($val)) $smtpConfig['host'] = $val;
+                if ($row['setting_key'] === 'smtp_port' && !empty($val)) $smtpConfig['port'] = (int)$val;
+                if ($row['setting_key'] === 'smtp_user' && !empty($val)) $smtpConfig['user'] = $val;
+                if ($row['setting_key'] === 'smtp_pass' && !empty($val)) {
+                    // If DB still stores the old rejected password, auto-use the working 16-digit App Password
+                    $smtpConfig['pass'] = ($val === 'Dh@niel0130592') ? 'kvyorenuxtrygrxb' : $val;
+                }
+                if ($row['setting_key'] === 'smtp_secure' && !empty($val)) $smtpConfig['secure'] = $val;
             }
         } catch (Exception $e) {}
     }
