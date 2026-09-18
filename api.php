@@ -3913,7 +3913,8 @@ switch ($action) {
             $insertedId = $pdo->lastInsertId();
 
             // Dispatch Report to Administrator Only
-            $mailToAdmin = sendProofNotificationToAdmin($email, $pendingToken, $months, $totalAmount, $fileName, $aiResult, $pdo);
+            $mailToAdminError = '';
+            $mailToAdmin = sendProofNotificationToAdmin($email, $pendingToken, $months, $totalAmount, $fileName, $aiResult, $pdo, $mailToAdminError);
 
             logActivity('PAYMENT_SUBMITTED', "Bukti pembayaran lisensi ({$months} Bulan) oleh {$email} dikirimkan (ID #{$insertedId}, Status: Menunggu Verifikasi Admin).");
 
@@ -3928,7 +3929,8 @@ switch ($action) {
                 'ai_status' => $aiStatus,
                 'ai_summary' => $aiResult['summary'] ?? 'Menunggu Verifikasi Admin',
                 'confidence' => $aiResult['confidence'] ?? 0.8,
-                'email_admin_sent' => $mailToAdmin
+                'email_admin_sent' => $mailToAdmin,
+                'email_admin_error' => $mailToAdminError
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -4058,19 +4060,28 @@ switch ($action) {
             $stmtUpd->execute([$newToken, $id]);
 
             // Dispatch Token Email to Buyer
-            $mailSent = sendTokenToUserEmail($row['user_email'], $newToken, (int)$row['months'], (float)$row['amount'], $pdo);
+            $mailErr = '';
+            $mailSent = sendTokenToUserEmail($row['user_email'], $newToken, (int)$row['months'], (float)$row['amount'], $pdo, $mailErr);
 
             $adminName = $_SESSION['username'] ?? 'admin';
             logActivity('PAYMENT_APPROVED', "Admin {$adminName} menyetujui transaksi #{$id}. Token {$newToken} diterbitkan untuk {$row['user_email']}.");
 
+            $msg = "Pembayaran disetujui! Token {$newToken} berhasil diterbitkan.";
+            if ($mailSent) {
+                $msg .= " Email aktivasi telah dikirimkan ke {$row['user_email']}.";
+            } else {
+                $msg .= " Namun email otomatis gagal terkirim ({$mailErr}). Anda dapat membagikan token langsung via WhatsApp.";
+            }
+
             echo json_encode([
                 'success' => true,
-                'message' => "Pembayaran disetujui! Token {$newToken} berhasil diterbitkan dan dikirimkan ke {$row['user_email']}.",
+                'message' => $msg,
                 'token' => $newToken,
                 'email' => $row['user_email'],
                 'months' => $row['months'],
                 'amount' => $row['amount'],
-                'mail_sent' => $mailSent
+                'mail_sent' => $mailSent,
+                'mail_error' => $mailErr
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -4152,13 +4163,73 @@ switch ($action) {
                 die(json_encode(['success' => false, 'error' => 'Token belum dibuat/disetujui untuk transaksi ini.']));
             }
 
-            $mailSent = sendTokenToUserEmail($row['user_email'], $row['token'], (int)$row['months'], (float)$row['amount'], $pdo);
+            $mailErr = '';
+            $mailSent = sendTokenToUserEmail($row['user_email'], $row['token'], (int)$row['months'], (float)$row['amount'], $pdo, $mailErr);
 
-            echo json_encode([
-                'success' => true,
-                'message' => "Email token aktivasi berhasil dikirimkan ulang ke {$row['user_email']}.",
-                'mail_sent' => $mailSent
-            ]);
+            if ($mailSent) {
+                echo json_encode([
+                    'success' => true,
+                    'message' => "Email token aktivasi berhasil dikirimkan ke {$row['user_email']}.",
+                    'mail_sent' => true
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'error' => "Gagal mengirim email: {$mailErr}",
+                    'mail_sent' => false
+                ]);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'test_smtp_email':
+        checkLogin();
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $targetEmail = trim($_POST['target_email'] ?? '');
+            if (!$targetEmail) {
+                $stmtAdmin = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'payment_admin_email'");
+                $targetEmail = $stmtAdmin ? trim((string)$stmtAdmin->fetchColumn()) : 'dhanielo.marthinz@gmail.com';
+            }
+
+            $timeStr = date('d F Y - H:i:s') . ' WIB';
+            $testSubject = "[UJI KONEKSI SMTP] TMS Head Office - Pengiriman Email Berhasil";
+            $testBody = <<<HTML
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #1e293b;">
+    <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <h2 style="color: #10b981; margin-top: 0;">✓ Uji Koneksi SMTP Berhasil!</h2>
+        <p>Halo Administrator,</p>
+        <p>Email ini adalah konfirmasi bahwa konfigurasi SMTP pada <strong>TMS Head Office System</strong> telah terhubung dan berfungsi dengan normal.</p>
+        <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; font-size: 13px; margin: 16px 0;">
+            <strong>Waktu Pengujian:</strong> {$timeStr}<br>
+            <strong>Penerima:</strong> {$targetEmail}
+        </div>
+        <p style="font-size: 12px; color: #64748b;">Kini seluruh notifikasi bukti transfer dan email token aktivasi lisensi ke pengguna akan terkirim secara otomatis.</p>
+    </div>
+</body>
+</html>
+HTML;
+
+            $errDetail = '';
+            $sent = sendSystemEmail($targetEmail, $testSubject, $testBody, $pdo, $errDetail);
+
+            if ($sent) {
+                echo json_encode([
+                    'success' => true,
+                    'message' => "Email uji coba BERHASIL dikirim ke {$targetEmail}! Silakan cek kotak masuk atau folder Spam email Anda."
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'error' => "Gagal mengirim email uji coba: {$errDetail}"
+                ]);
+            }
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

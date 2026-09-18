@@ -482,10 +482,22 @@ $current_page = 'system_license.php';
                             </small>
                         </div>
 
-                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-heading); margin-top: 1rem; margin-bottom: 8px;">
-                            Konfigurasi SMTP Pengiriman Email (Opsional):
+                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-heading); margin-top: 1rem; margin-bottom: 6px;">
+                            Konfigurasi SMTP Pengiriman Email (Gmail / Mail Server):
                         </div>
-                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px;">
+                        
+                        <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.74rem; color: #cbd5e1; line-height: 1.5;">
+                            <strong style="color: #38bdf8; display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+                                <span class="material-symbols-outlined" style="font-size: 15px;">info</span>
+                                PENTING: Pengaturan Akun Gmail
+                            </strong>
+                            Hosting website memblokir fungsi <code>mail()</code> biasa. Agar bukti transfer &amp; token lisensi dapat terkirim, gunakan SMTP Gmail:<br>
+                            1. Host: <code>smtp.gmail.com</code> | Port: <code>587</code> (TLS) atau <code>465</code> (SSL).<br>
+                            2. <strong>Password SMTP WAJIB memakai Sandi Aplikasi (16 digit)</strong>, bukan password login biasa Anda.<br>
+                            3. Buat sandi aplikasi di: <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline; font-weight: 700;">Google Account &gt; Keamanan &gt; Sandi Aplikasi</a>.
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
                             <div class="form-group">
                                 <label style="font-size: 0.75rem;">SMTP Host</label>
                                 <input type="text" id="cfgSmtpHost" name="smtp_host" class="form-control" placeholder="smtp.gmail.com">
@@ -494,6 +506,13 @@ $current_page = 'system_license.php';
                                 <label style="font-size: 0.75rem;">Port</label>
                                 <input type="number" id="cfgSmtpPort" name="smtp_port" class="form-control" placeholder="587">
                             </div>
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">Keamanan</label>
+                                <select id="cfgSmtpSecure" name="smtp_secure" class="form-control">
+                                    <option value="tls">TLS</option>
+                                    <option value="ssl">SSL</option>
+                                </select>
+                            </div>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             <div class="form-group">
@@ -501,15 +520,21 @@ $current_page = 'system_license.php';
                                 <input type="text" id="cfgSmtpUser" name="smtp_user" class="form-control" placeholder="user@gmail.com">
                             </div>
                             <div class="form-group">
-                                <label style="font-size: 0.75rem;">Password / App Password</label>
-                                <input type="password" id="cfgSmtpPass" name="smtp_pass" class="form-control" placeholder="••••••••">
+                                <label style="font-size: 0.75rem;">Password / 16-Digit App Password</label>
+                                <input type="password" id="cfgSmtpPass" name="smtp_pass" class="form-control" placeholder="••••••••••••••••">
                             </div>
                         </div>
 
-                        <button type="submit" id="btnSaveAiSmtp" class="btn-submit-main" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
-                            <span class="material-symbols-outlined">save</span>
-                            Simpan Pengaturan AI & Email
-                        </button>
+                        <div style="display: flex; gap: 8px; margin-top: 4px;">
+                            <button type="submit" id="btnSaveAiSmtp" class="btn-submit-main" style="flex: 1; background: linear-gradient(135deg, #0284c7, #0369a1);">
+                                <span class="material-symbols-outlined">save</span>
+                                Simpan Pengaturan AI & Email
+                            </button>
+                            <button type="button" id="btnTestSmtp" class="btn-submit-main" style="flex: 0 0 auto; background: linear-gradient(135deg, #10b981, #059669); padding: 0 14px;" title="Uji coba kirim email sekarang">
+                                <span class="material-symbols-outlined">send</span>
+                                Uji Kirim Email
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -934,6 +959,7 @@ $current_page = 'system_license.php';
                     }
                     document.getElementById('cfgSmtpHost').value = c.smtp_host || '';
                     document.getElementById('cfgSmtpPort').value = c.smtp_port || 587;
+                    document.getElementById('cfgSmtpSecure').value = c.smtp_secure || (c.smtp_port == 465 ? 'ssl' : 'tls');
                     document.getElementById('cfgSmtpUser').value = c.smtp_user || '';
                     document.getElementById('cfgSmtpPass').value = c.smtp_pass || '';
                 }
@@ -1195,6 +1221,53 @@ $current_page = 'system_license.php';
                 btn.innerHTML = '<span class="material-symbols-outlined">save</span> Simpan Pengaturan AI & Email';
             }
         };
+
+        const cfgPort = document.getElementById('cfgSmtpPort');
+        const cfgSecure = document.getElementById('cfgSmtpSecure');
+        if (cfgPort && cfgSecure) {
+            cfgPort.addEventListener('change', (e) => {
+                if (e.target.value == 465) cfgSecure.value = 'ssl';
+                if (e.target.value == 587) cfgSecure.value = 'tls';
+            });
+            cfgSecure.addEventListener('change', (e) => {
+                if (e.target.value === 'ssl') cfgPort.value = 465;
+                if (e.target.value === 'tls') cfgPort.value = 587;
+            });
+        }
+
+        const btnTest = document.getElementById('btnTestSmtp');
+        if (btnTest) {
+            btnTest.onclick = async () => {
+                const form = document.getElementById('aiSmtpForm');
+                btnTest.disabled = true;
+                btnTest.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite;">progress_activity</span> Menguji...';
+
+                try {
+                    // Auto-save settings first so test runs against latest credentials
+                    await fetch('./api.php?action=update_payment_settings', { method: 'POST', body: new FormData(form) });
+
+                    const targetEmail = document.getElementById('cfgSmtpUser').value || document.getElementById('cfgAdminEmail').value || '';
+                    const testFormData = new FormData();
+                    testFormData.append('target_email', targetEmail);
+
+                    const res = await fetch('./api.php?action=test_smtp_email', { method: 'POST', body: testFormData });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        alert("✓ " + data.message);
+                    } else {
+                        showToast(data.error || 'Uji kirim email gagal', 'error');
+                        alert("✗ " + (data.error || 'Uji kirim email gagal'));
+                    }
+                } catch (err) {
+                    showToast('Terjadi gangguan koneksi ke server saat menguji SMTP', 'error');
+                } finally {
+                    btnTest.disabled = false;
+                    btnTest.innerHTML = '<span class="material-symbols-outlined">send</span> Uji Kirim Email';
+                }
+            };
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
             fetchLicenseData();

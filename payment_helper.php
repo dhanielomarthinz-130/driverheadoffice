@@ -248,7 +248,7 @@ function analyzeReceiptHeuristics($filePath, $expectedAmount, $expectedMonths) {
 /**
  * Universal Mail Dispatcher (SMTP with fallback to PHP mail() and DB audit logging)
  */
-function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null) {
+function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null, &$lastError = null) {
     // 1. Get SMTP Configuration from system_settings if available
     $smtpConfig = [
         'host' => '',
@@ -272,17 +272,23 @@ function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null) {
     }
 
     $sent = false;
-    $methodUsed = 'mail()';
+    $methodUsed = 'None';
+    $smtpError = '';
 
     // 2. Try SMTP if host and user configured
     if (!empty($smtpConfig['host']) && !empty($smtpConfig['user'])) {
-        $sent = sendSocketSMTP($toEmail, $subject, $htmlBody, $smtpConfig);
+        $sent = sendSocketSMTP($toEmail, $subject, $htmlBody, $smtpConfig, $smtpError);
         if ($sent) {
-            $methodUsed = 'SMTP (' . $smtpConfig['host'] . ')';
+            $methodUsed = 'SMTP (' . $smtpConfig['host'] . ':' . ($smtpConfig['port'] ?: 587) . ')';
+        } else {
+            $lastError = $smtpError;
         }
+    } else {
+        $smtpError = 'SMTP belum dikonfigurasi di Pengaturan Lisensi (Host & User kosong).';
+        $lastError = $smtpError;
     }
 
-    // 3. Fallback to PHP native mail()
+    // 3. Fallback to PHP native mail() if SMTP was not successful
     if (!$sent) {
         $headers  = "MIME-Version: 1.0\r\n";
         $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
@@ -291,8 +297,15 @@ function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null) {
         $headers .= "Reply-To: {$fromEmail}\r\n";
         $headers .= "X-Mailer: PHP/" . phpversion();
 
-        $sent = @mail($toEmail, '=?UTF-8?B?' . base64_encode($subject) . '?=', $htmlBody, $headers);
-        $methodUsed = 'PHP mail()';
+        $nativeSent = @mail($toEmail, '=?UTF-8?B?' . base64_encode($subject) . '?=', $htmlBody, $headers);
+        if ($nativeSent) {
+            $sent = true;
+            $methodUsed = 'PHP mail()';
+        } else {
+            if (empty($lastError)) {
+                $lastError = 'PHP mail() tidak aktif di server ini dan SMTP belum disetel.';
+            }
+        }
     }
 
     // 4. Log outgoing email in database / system logs for tracking
@@ -303,15 +316,16 @@ function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null) {
                   `id` INT AUTO_INCREMENT PRIMARY KEY,
                   `recipient` VARCHAR(255) NOT NULL,
                   `subject` VARCHAR(255) NOT NULL,
-                  `status` VARCHAR(50) NOT NULL,
+                  `status` VARCHAR(255) NOT NULL,
                   `method` VARCHAR(100) NOT NULL,
                   `content_preview` TEXT NULL,
                   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             ");
             $preview = substr(strip_tags($htmlBody), 0, 200);
+            $logStatus = $sent ? 'SENT' : ('FAILED: ' . substr($lastError ?: 'Unknown error', 0, 150));
             $stmtLog = $pdo->prepare("INSERT INTO system_email_logs (recipient, subject, status, method, content_preview) VALUES (?, ?, ?, ?, ?)");
-            $stmtLog->execute([$toEmail, $subject, $sent ? 'SENT' : 'LOGGED', $methodUsed, $preview]);
+            $stmtLog->execute([$toEmail, $subject, $logStatus, $methodUsed, $preview]);
         } catch (Exception $e) {}
     }
 
@@ -319,28 +333,71 @@ function sendSystemEmail($toEmail, $subject, $htmlBody, $pdo = null) {
 }
 
 /**
- * Lightweight Zero-Dependency Native Socket SMTP Client
+ * Lightweight Zero-Dependency Native Socket SMTP Client with SSL/TLS auto-negotiation
  */
-function sendSocketSMTP($toEmail, $subject, $htmlBody, $config) {
-    $host = $config['host'];
-    $port = $config['port'] ?: 587;
-    $user = $config['user'];
-    $pass = $config['pass'];
-    $secure = strtolower($config['secure'] ?: 'tls');
+function sendSocketSMTP($toEmail, $subject, $htmlBody, $config, &$errorDetail = null) {
+    $host = trim($config['host']);
+    $port = (int)($config['port'] ?: 587);
+    $user = trim($config['user']);
+    $pass = trim($config['pass']);
+    $secure = strtolower($config['secure'] ?: ($port === 465 ? 'ssl' : 'tls'));
 
-    $socketHost = ($secure === 'ssl') ? "ssl://{$host}" : $host;
-    $timeout = 10;
-    
-    $errno = 0;
-    $errstr = '';
-    $socket = @fsockopen($socketHost, $port, $errno, $errstr, $timeout);
-    if (!$socket) return false;
+    if (empty($host) || empty($user)) {
+        $errorDetail = 'Host dan User SMTP wajib diisi.';
+        return false;
+    }
+
+    // Connect with stream context disabling strict peer checks to prevent SSL failures on local/shared hosting
+    $context = stream_context_create([
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
+            'allow_self_signed' => true
+        ]
+    ]);
+
+    $connect = function($targetHost, $targetPort, $isSsl) use ($context, &$errorDetail) {
+        $socketTarget = $isSsl ? "ssl://{$targetHost}:{$targetPort}" : "tcp://{$targetHost}:{$targetPort}";
+        $errno = 0;
+        $errstr = '';
+        $socket = @stream_socket_client($socketTarget, $errno, $errstr, 12, STREAM_CLIENT_CONNECT, $context);
+        if (!$socket) {
+            $errorDetail = "Gagal terhubung ke {$socketTarget}: {$errstr} (Error #{$errno})";
+            return null;
+        }
+        stream_set_timeout($socket, 15);
+        return $socket;
+    };
+
+    $isSsl = ($secure === 'ssl' || $port === 465);
+    $socket = $connect($host, $port, $isSsl);
+
+    // Fallback: If port 587 fails, try port 465 (or vice-versa) for common hosts like Gmail
+    if (!$socket) {
+        if ($port === 587 && strpos($host, 'gmail') !== false) {
+            $socket = $connect($host, 465, true);
+            if ($socket) {
+                $port = 465;
+                $isSsl = true;
+            }
+        } elseif ($port === 465 && strpos($host, 'gmail') !== false) {
+            $socket = $connect($host, 587, false);
+            if ($socket) {
+                $port = 587;
+                $isSsl = false;
+            }
+        }
+    }
+
+    if (!$socket) {
+        return false;
+    }
 
     $read = function() use ($socket) {
         $data = '';
         while ($str = fgets($socket, 515)) {
             $data .= $str;
-            if (substr($str, 3, 1) === ' ') break;
+            if (isset($str[3]) && $str[3] === ' ') break;
         }
         return $data;
     };
@@ -349,36 +406,85 @@ function sendSocketSMTP($toEmail, $subject, $htmlBody, $config) {
         fputs($socket, $cmd . "\r\n");
     };
 
-    $read();
-    $send("EHLO " . ($_SERVER['SERVER_NAME'] ?? 'localhost'));
+    $greeting = $read();
+
+    $clientDomain = !empty($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'localhost';
+    $send("EHLO " . $clientDomain);
     $ehloRes = $read();
 
-    if ($secure === 'tls' && strpos($ehloRes, 'STARTTLS') !== false) {
+    // Handle STARTTLS for port 587 / TLS
+    if (!$isSsl && strpos($ehloRes, 'STARTTLS') !== false) {
         $send("STARTTLS");
-        $read();
-        stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-        $send("EHLO " . ($_SERVER['SERVER_NAME'] ?? 'localhost'));
-        $read();
+        $starttlsRes = $read();
+        if (substr($starttlsRes, 0, 3) === '220') {
+            $cryptoMethod = STREAM_CRYPTO_METHOD_TLS_CLIENT;
+            if (defined('STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT')) {
+                $cryptoMethod |= STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT;
+            }
+            if (defined('STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT')) {
+                $cryptoMethod |= STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT;
+            }
+            $cryptoOk = @stream_socket_enable_crypto($socket, true, $cryptoMethod);
+            if (!$cryptoOk) {
+                $errorDetail = "Enkripsi TLS gagal dinegosiasikan dengan {$host}:{$port}.";
+                fclose($socket);
+                return false;
+            }
+            $send("EHLO " . $clientDomain);
+            $ehloRes = $read();
+        }
     }
 
+    // SMTP Authentication
     $send("AUTH LOGIN");
-    $read();
-    $send(base64_encode($user));
-    $read();
-    $send(base64_encode($pass));
-    $authRes = $read();
-
-    if (substr($authRes, 0, 3) !== '235') {
+    $authReq = $read();
+    if (substr($authReq, 0, 3) !== '334') {
+        $errorDetail = "Server SMTP menolak perintah AUTH LOGIN: " . trim($authReq);
         fclose($socket);
         return false;
     }
 
+    $send(base64_encode($user));
+    $userRes = $read();
+
+    $send(base64_encode($pass));
+    $passRes = $read();
+
+    if (substr($passRes, 0, 3) !== '235') {
+        $trimmedRes = trim($passRes);
+        if (strpos($trimmedRes, '535') !== false || stripos($trimmedRes, 'bad') !== false || stripos($trimmedRes, 'credentials') !== false) {
+            $errorDetail = "Login SMTP Ditolak ({$trimmedRes}). Jika memakai Gmail, Anda WAJIB menggunakan 'Sandi Aplikasi (16-digit App Password)' dari Akun Google, BUKAN password email biasa.";
+        } else {
+            $errorDetail = "Autentikasi SMTP Gagal: {$trimmedRes}";
+        }
+        fclose($socket);
+        return false;
+    }
+
+    // Transaction
     $send("MAIL FROM: <{$user}>");
-    $read();
+    $mailFromRes = $read();
+    if (substr($mailFromRes, 0, 3) !== '250') {
+        $errorDetail = "MAIL FROM ditolak: " . trim($mailFromRes);
+        fclose($socket);
+        return false;
+    }
+
     $send("RCPT TO: <{$toEmail}>");
-    $read();
+    $rcptRes = $read();
+    if (substr($rcptRes, 0, 3) !== '250') {
+        $errorDetail = "RCPT TO ditolak ({$toEmail}): " . trim($rcptRes);
+        fclose($socket);
+        return false;
+    }
+
     $send("DATA");
-    $read();
+    $dataReadyRes = $read();
+    if (substr($dataReadyRes, 0, 3) !== '354') {
+        $errorDetail = "DATA command ditolak: " . trim($dataReadyRes);
+        fclose($socket);
+        return false;
+    }
 
     $headers = [
         "From: TMS Head Office System <{$user}>",
@@ -395,13 +501,19 @@ function sendSocketSMTP($toEmail, $subject, $htmlBody, $config) {
     $send("QUIT");
     fclose($socket);
 
-    return (substr($dataRes, 0, 3) === '250');
+    if (substr($dataRes, 0, 3) === '250') {
+        $errorDetail = null;
+        return true;
+    }
+
+    $errorDetail = "Pesan ditolak setelah DATA: " . trim($dataRes);
+    return false;
 }
 
 /**
  * Send License Activation Token Email to Buyer
  */
-function sendTokenToUserEmail($userEmail, $token, $months, $amount, $pdo) {
+function sendTokenToUserEmail($userEmail, $token, $months, $amount, $pdo, &$lastError = null) {
     $formattedAmount = "Rp " . number_format($amount, 0, ',', '.');
     $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     $activationUrl = $baseUrl . "/expired.php?token=" . urlencode($token);
@@ -478,13 +590,13 @@ function sendTokenToUserEmail($userEmail, $token, $months, $amount, $pdo) {
 </html>
 HTML;
 
-    return sendSystemEmail($userEmail, $subject, $htmlBody, $pdo);
+    return sendSystemEmail($userEmail, $subject, $htmlBody, $pdo, $lastError);
 }
 
 /**
  * Send Payment Proof Notification to Administrator (dhanielo.marthinz@gmail.com)
  */
-function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $proofFileName, $aiResult, $pdo) {
+function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $proofFileName, $aiResult, $pdo, &$lastError = null) {
     // Get Admin Email from settings (default: dhanielo.marthinz@gmail.com)
     $adminEmail = 'dhanielo.marthinz@gmail.com';
     if ($pdo) {
@@ -588,5 +700,5 @@ function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $pro
 </html>
 HTML;
 
-    return sendSystemEmail($adminEmail, $subject, $htmlBody, $pdo);
+    return sendSystemEmail($adminEmail, $subject, $htmlBody, $pdo, $lastError);
 }

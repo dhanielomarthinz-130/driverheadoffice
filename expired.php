@@ -273,28 +273,33 @@ $initialToken = trim($_GET['token'] ?? '');
             right: 24px;
             background: #25D366;
             color: #ffffff;
-            padding: 12px 20px;
-            border-radius: 99px;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
             text-decoration: none;
-            font-weight: 700;
-            font-size: 0.88rem;
-            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.45);
+            box-shadow: 0 10px 25px rgba(37, 211, 102, 0.45);
             z-index: 999;
             transition: all 0.25s ease;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.25);
         }
 
         .floating-wa:hover {
-            transform: translateY(-3px) scale(1.03);
-            box-shadow: 0 14px 35px rgba(37, 211, 102, 0.6);
+            transform: translateY(-4px) scale(1.08);
+            box-shadow: 0 14px 30px rgba(37, 211, 102, 0.6);
             background: #20ba5a;
             color: #ffffff;
         }
 
-        .floating-wa svg,
+        .floating-wa svg {
+            width: 28px;
+            height: 28px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+
         .btn-whatsapp-cta svg {
             width: 22px;
             height: 22px;
@@ -371,7 +376,7 @@ $initialToken = trim($_GET['token'] ?? '');
 
             <a href="https://wa.me/62822107031118?text=Halo%20Admin%20TMS,%20saya%20ingin%20bertanya%20mengenai%20perpanjangan%20masa%20aktif%20lisensi%20sistem." target="_blank" rel="noopener noreferrer" class="btn-whatsapp-cta">
                 <svg viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.592 2.654-.696c1.001.574 1.761.855 2.806.855 3.18 0 5.767-2.587 5.767-5.766.001-3.18-2.585-5.768-5.767-5.768zm3.376 8.204c-.149.418-.752.793-1.042.845-.275.048-.624.088-1.795-.398-1.503-.623-2.473-2.15-2.548-2.25-.075-.101-.611-.813-.611-1.549 0-.736.386-1.098.523-1.248.137-.149.3-.187.4-.187.1 0 .2 0 .287.005.093.004.218-.035.341.261.129.308.439 1.07.478 1.149.039.078.064.17.014.27-.05.099-.075.161-.149.248-.075.086-.157.193-.224.259-.075.074-.153.155-.066.304.087.149.387.639.83 1.033.57.507 1.05.664 1.2.738.149.075.237.062.325-.038.087-.1.374-.436.474-.585.1-.149.2-.124.336-.074.137.05.868.409 1.018.484.149.075.249.112.286.174.037.063.037.362-.112.78zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.954-1.399C8.423 21.493 10.15 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
-                <span>Hubungi Admin via WhatsApp (0822-1070-31118)</span>
+                <span>Hubungi Admin via WhatsApp</span>
             </a>
         </div>
 
@@ -409,7 +414,7 @@ $initialToken = trim($_GET['token'] ?? '');
             <ul>
                 <li>Seluruh data penugasan, master lokasi, armada, dan user tetap aman tersimpan.</li>
                 <li>Setelah token diaktivasi, sistem otomatis terbuka tanpa perlu instalasi ulang.</li>
-                <li>Butuh bantuan / konfirmasi cepat? Chat WhatsApp: <a href="https://wa.me/62822107031118" target="_blank" style="color: #34d399; font-weight: 700; text-decoration: underline;">0822-1070-31118</a> atau email <strong>dhanielo.marthinz@gmail.com</strong></li>
+                <li>Butuh bantuan / konfirmasi cepat? Chat WhatsApp: <a href="https://wa.me/62822107031118" target="_blank" style="color: #34d399; font-weight: 700; text-decoration: underline;">Hubungi via WhatsApp</a> atau email <strong>dhanielo.marthinz@gmail.com</strong></li>
             </ul>
         </div>
 
@@ -418,10 +423,9 @@ $initialToken = trim($_GET['token'] ?? '');
         </div>
     </div>
 
-    <!-- FLOATING WHATSAPP BUTTON -->
+    <!-- FLOATING WHATSAPP BUTTON (ICON ONLY) -->
     <a href="https://wa.me/62822107031118?text=Halo%20Admin%20TMS,%20saya%20ingin%20bertanya%20mengenai%20perpanjangan%20masa%20aktif%20lisensi%20sistem." target="_blank" rel="noopener noreferrer" class="floating-wa" title="Hubungi Admin via WhatsApp">
         <svg viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.592 2.654-.696c1.001.574 1.761.855 2.806.855 3.18 0 5.767-2.587 5.767-5.766.001-3.18-2.585-5.768-5.767-5.768zm3.376 8.204c-.149.418-.752.793-1.042.845-.275.048-.624.088-1.795-.398-1.503-.623-2.473-2.15-2.548-2.25-.075-.101-.611-.813-.611-1.549 0-.736.386-1.098.523-1.248.137-.149.3-.187.4-.187.1 0 .2 0 .287.005.093.004.218-.035.341.261.129.308.439 1.07.478 1.149.039.078.064.17.014.27-.05.099-.075.161-.149.248-.075.086-.157.193-.224.259-.075.074-.153.155-.066.304.087.149.387.639.83 1.033.57.507 1.05.664 1.2.738.149.075.237.062.325-.038.087-.1.374-.436.474-.585.1-.149.2-.124.336-.074.137.05.868.409 1.018.484.149.075.249.112.286.174.037.063.037.362-.112.78zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.954-1.399C8.423 21.493 10.15 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
-        <span>Chat WhatsApp (0822-1070-31118)</span>
     </a>
 
     <script>
