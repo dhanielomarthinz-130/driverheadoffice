@@ -1075,11 +1075,15 @@ $current_page = 'system_license.php';
                             tokenDisplay = `<div style="font-family:monospace; font-weight:800; color:var(--primary); letter-spacing:1px;">${t.token}</div>`;
                             actionsHtml = `
                                 <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
-                                    <button type="button" onclick="copyText('${t.token}', 'Token berhasil disalin!')" style="background:#e0e7ff; color:#4338ca; border:none; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                    <button type="button" onclick="copyText('${t.token}', 'Token berhasil disalin!')" style="background:#e0e7ff; color:#4338ca; border:none; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Salin kode token">
                                         <span class="material-symbols-outlined" style="font-size:14px;">content_copy</span>
                                         <span>Salin</span>
                                     </button>
-                                    <button type="button" onclick="resendTokenEmail(${t.id})" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                    <a href="https://wa.me/?text=${encodeURIComponent('Halo, pembayaran lisensi TMS Anda telah disetujui! Berikut Kode Token Aktivasi Anda:\n\n*' + t.token + '*\n\nSilakan masukkan token ini pada halaman sistem untuk mengaktifkan kembali.')}" target="_blank" rel="noopener noreferrer" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; text-decoration:none; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; display:inline-flex; align-items:center; gap:4px;" title="Kirim token via WhatsApp">
+                                        <svg viewBox="0 0 24 24" style="width:13px; height:13px; fill:currentColor;"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.592 2.654-.696c1.001.574 1.761.855 2.806.855 3.18 0 5.767-2.587 5.767-5.766.001-3.18-2.585-5.768-5.767-5.768zm3.376 8.204c-.149.418-.752.793-1.042.845-.275.048-.624.088-1.795-.398-1.503-.623-2.473-2.15-2.548-2.25-.075-.101-.611-.813-.611-1.549 0-.736.386-1.098.523-1.248.137-.149.3-.187.4-.187.1 0 .2 0 .287.005.093.004.218-.035.341.261.129.308.439 1.07.478 1.149.039.078.064.17.014.27-.05.099-.075.161-.149.248-.075.086-.157.193-.224.259-.075.074-.153.155-.066.304.087.149.387.639.83 1.033.57.507 1.05.664 1.2.738.149.075.237.062.325-.038.087-.1.374-.436.474-.585.1-.149.2-.124.336-.074.137.05.868.409 1.018.484.149.075.249.112.286.174.037.063.037.362-.112.78zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.954-1.399C8.423 21.493 10.15 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+                                        <span>WhatsApp</span>
+                                    </a>
+                                    <button type="button" onclick="resendTokenEmail(${t.id}, this)" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Kirim ulang ke email pembeli">
                                         <span class="material-symbols-outlined" style="font-size:14px;">mail</span>
                                         <span>Kirim Ulang Email</span>
                                     </button>
@@ -1194,20 +1198,37 @@ $current_page = 'system_license.php';
             }
         }
 
-        async function resendTokenEmail(id) {
+        async function resendTokenEmail(id, btn = null) {
             if (!confirm('Kirim ulang email token aktivasi ke pembeli?')) return;
+
+            let originalHtml = '';
+            if (btn) {
+                btn.disabled = true;
+                originalHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite; font-size:14px;">progress_activity</span><span>Mengirim...</span>';
+            }
+
             try {
                 const formData = new FormData();
                 formData.append('id', id);
                 const res = await fetch('./api.php?action=resend_token_email', { method: 'POST', body: formData });
                 const data = await res.json();
+
                 if (data.success) {
                     showToast(data.message, 'success');
+                    alert("✓ " + data.message);
                 } else {
-                    showToast(data.error || 'Gagal mengirim ulang email', 'error');
+                    const err = data.error || 'Gagal mengirim ulang email';
+                    showToast(err, 'error');
+                    alert("✗ " + err + "\n\nCatatan Penting:\n1. Hosting memblokir fungsi mail() biasa.\n2. Pastikan kolom Password di kartu SMTP diisi dengan 16-Digit Sandi Aplikasi Google (bukan password email biasa).\n3. Anda juga dapat langsung menekan tombol 'WhatsApp' atau 'Salin' di tabel untuk mengirim token ke pembeli.");
                 }
             } catch (err) {
-                showToast('Gangguan jaringan', 'error');
+                showToast('Gangguan jaringan saat menghubungi server', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
             }
         }
 
