@@ -1,9 +1,10 @@
 <?php
 require_once 'auth_check.php';
 require_once 'db_config.php';
+checkLogin();
 
 if ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'controller') {
-    header('Location: driver.php');
+    header('Location: driver');
     exit;
 }
 ?>

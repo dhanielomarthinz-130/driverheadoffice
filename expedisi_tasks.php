@@ -1295,7 +1295,7 @@ $init_exp = $pdo->query("SELECT COUNT(*) FROM expedisi_tasks WHERE status = 'pen
         const CAN_WRITE = <?php echo $can_write ? 'true' : 'false'; ?>;
         const USER_ROLE = '<?php echo $_SESSION['role'] ?? ""; ?>';
         const IS_SUPERADMIN = <?php echo (in_array($_SESSION['role'] ?? '', ['superadmin', 'controller'], true)) ? 'true' : 'false'; ?>;
-        const ADMIN_NAME = '<?php echo $_SESSION['name'] ?? "Admin"; ?>';
+        const ADMIN_NAME = <?php echo json_encode($_SESSION['name'] ?? 'Admin'); ?>;
         let finishTaskId = null;
         let finishMode = 'completed';
         let taskData = [];

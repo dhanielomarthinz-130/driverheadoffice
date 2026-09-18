@@ -3,8 +3,26 @@ if (session_status() === PHP_SESSION_NONE) {
     @ini_set('session.cookie_httponly', '1');
     @ini_set('session.cookie_samesite', 'Lax');
     @ini_set('session.use_only_cookies', '1');
+    if (isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) === 'on') {
+        @ini_set('session.cookie_secure', '1');
+    }
     session_start();
 }
+
+// Generate session-bound CSRF token if not already generated
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Global Defense-in-Depth Security Headers (Independent of Web Server)
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-XSS-Protection: 1; mode=block');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(self), geolocation=(self), microphone=()');
+}
+
 
 /**
  * Helper function for XSS sanitization
@@ -137,6 +155,29 @@ function ensureLicenseTablesExist($pdo) {
               `payment_notes` TEXT NULL,
               `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+            CREATE TABLE IF NOT EXISTS `system_license_tokens` (
+              `id` INT AUTO_INCREMENT PRIMARY KEY,
+              `token` VARCHAR(64) NOT NULL UNIQUE,
+              `months` INT NOT NULL,
+              `user_email` VARCHAR(255) NOT NULL,
+              `amount` DECIMAL(15,2) DEFAULT 0,
+              `payment_proof` VARCHAR(255) NULL,
+              `ai_status` VARCHAR(50) DEFAULT 'verified',
+              `ai_analysis` TEXT NULL,
+              `status` ENUM('active', 'used', 'expired') DEFAULT 'active',
+              `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+              `used_at` DATETIME NULL,
+              `used_by_ip` VARCHAR(45) NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+            INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
+            ('payment_bank_name', 'BCA'),
+            ('payment_account_number', '1234567890'),
+            ('payment_account_holder', 'Dhanielo Marthinz'),
+            ('payment_price_per_month', '150000'),
+            ('payment_admin_email', 'dhanielo.marthinz@gmail.com')
+            ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
         ");
         $checked = true;
     } catch (Exception $e) {}
@@ -355,3 +396,105 @@ function logActivity($action, $description) {
         // Silently fail
     }
 }
+
+/**
+ * Universal Database & Sliding-Window Rate Limiter
+ * Mencegah serangan nembak API, spamming, bot brute force, dan scraping data massal
+ */
+function enforceApiRateLimit($pdo, $action) {
+    if (!$pdo || empty($action)) return;
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
+    $windowSize = 60; // Window 60 detik (1 menit)
+
+    // Tentukan kategori aksi dan batasan maksimal request per menit
+    if (in_array($action, ['login', 'submit_payment', 'redeem_license_token'], true)) {
+        $group = 'auth_payment';
+        $maxRequests = 15; // Maksimal 15 request/menit untuk aksi sensitif
+    } elseif ($action === 'update_location') {
+        $group = 'location';
+        $maxRequests = 120; // Maksimal 120 request/menit untuk tracking GPS
+    } elseif (strpos($action, 'get_') === 0) {
+        $group = 'read_data';
+        $maxRequests = 120; // Maksimal 120 request/menit untuk anti-scraping
+    } else {
+        $group = 'write_data';
+        $maxRequests = 60; // Maksimal 60 request/menit untuk aksi modifikasi
+    }
+
+    $currentTime = time();
+    $windowStart = $currentTime - ($currentTime % $windowSize);
+
+    try {
+        static $rateLimitTableChecked = false;
+        if (!$rateLimitTableChecked) {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `api_rate_limits` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `ip_address` VARCHAR(45) NOT NULL,
+                    `action_group` VARCHAR(50) NOT NULL,
+                    `hits` INT NOT NULL DEFAULT 1,
+                    `window_start` INT NOT NULL,
+                    UNIQUE KEY `idx_ip_grp_win` (`ip_address`, `action_group`, `window_start`),
+                    INDEX `idx_win` (`window_start`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ");
+
+            // Pembersihan berkala data lama (>15 menit yang lalu)
+            if (random_int(1, 25) === 1) {
+                $oldTime = $currentTime - 900;
+                $pdo->exec("DELETE FROM api_rate_limits WHERE window_start < {$oldTime}");
+            }
+            $rateLimitTableChecked = true;
+        }
+
+        // Catat hit ke database
+        $stmt = $pdo->prepare("
+            INSERT INTO api_rate_limits (ip_address, action_group, hits, window_start)
+            VALUES (?, ?, 1, ?)
+            ON DUPLICATE KEY UPDATE hits = hits + 1
+        ");
+        $stmt->execute([$ip, $group, $windowStart]);
+
+        // Hitung total hits
+        $stmtCount = $pdo->prepare("
+            SELECT hits FROM api_rate_limits
+            WHERE ip_address = ? AND action_group = ? AND window_start = ?
+        ");
+        $stmtCount->execute([$ip, $group, $windowStart]);
+        $currentHits = (int)$stmtCount->fetchColumn();
+
+        $remaining = max(0, $maxRequests - $currentHits);
+        $resetTime = $windowStart + $windowSize;
+        $retryAfter = max(1, $resetTime - $currentTime);
+
+        // Kirim header rate limit standard
+        if (!headers_sent()) {
+            header("X-RateLimit-Limit: {$maxRequests}");
+            header("X-RateLimit-Remaining: {$remaining}");
+            header("X-RateLimit-Reset: {$resetTime}");
+        }
+
+        // Blokir jika melebihi kuota
+        if ($currentHits > $maxRequests) {
+            if (!headers_sent()) {
+                http_response_code(429); // 429 Too Many Requests
+                header("Retry-After: {$retryAfter}");
+            }
+
+            if ($currentHits === ($maxRequests + 1)) {
+                logActivity('RATE_LIMIT_BLOCKED', "IP {$ip} diblokir sementara karena melebihi batas request ({$maxRequests}/menit) pada aksi: {$action}");
+            }
+
+            die(json_encode([
+                'success' => false,
+                'rate_limited' => true,
+                'error' => 'Terlalu banyak permintaan (Rate limit exceeded). Sistem membatasi demi keamanan data. Silakan tunggu ' . $retryAfter . ' detik sebelum mencoba kembali.',
+                'retry_after' => $retryAfter
+            ]));
+        }
+    } catch (PDOException $e) {
+        // Fail-safe jika tabel lock / db busy
+    }
+}
+

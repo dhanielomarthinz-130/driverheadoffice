@@ -293,6 +293,10 @@ $can_write = true;
             <div class="bulk-action-bar">
                 <div class="bulk-left">
                     <?php if ($can_write): ?>
+                        <a href="api.php?action=export_database_backup&download=1" class="btn" style="background: linear-gradient(135deg, #10b981, #059669); color: white; text-decoration: none; padding: 0.6rem 1.15rem; border-radius: 10px; font-weight: 700; font-size: 0.875rem; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);" title="Download full SQL backup">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">cloud_download</span>
+                            <span>Backup Database (.SQL)</span>
+                        </a>
                         <button type="button" class="btn-danger-custom" id="btnDeleteSelected" onclick="truncateSelectedTables()" disabled>
                             <span class="material-symbols-outlined">delete_sweep</span>
                             <span>Kosongkan Tabel Terpilih (<span id="selectedCount">0</span>)</span>

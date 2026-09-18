@@ -1,12 +1,8 @@
 <?php
-session_start();
 require_once 'auth_check.php';
 require_once 'db_config.php';
+checkLogin();
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
-}
 
 $role = $_SESSION['role'];
 $username = $_SESSION['name'];

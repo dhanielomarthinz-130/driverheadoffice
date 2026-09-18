@@ -1,6 +1,6 @@
 <?php
 // Database configuration - Mendeteksi otomatis Environment (Localhost XAMPP vs InfinityFree Hosting)
-$is_localhost = isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']);
+$is_localhost = (php_sapi_name() === 'cli') || (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']));
 
 if ($is_localhost) {
     // Konfigurasi Database Localhost (XAMPP)

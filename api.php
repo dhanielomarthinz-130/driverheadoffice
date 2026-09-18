@@ -7,6 +7,7 @@ date_default_timezone_set('Asia/Jakarta');
 header('Content-Type: application/json');
 require_once 'db_config.php';
 require_once 'auth_check.php';
+require_once 'payment_helper.php';
 
 function resolveGmapsCoordsHelper($url)
 {
@@ -56,6 +57,11 @@ function resolveGmapsCoordsHelper($url)
 
 $action = $_GET['action'] ?? '';
 
+// Enforce Global Rate Limiting (Anti-Spam, Anti-Scraping & DDoS Shield)
+if ($action && function_exists('enforceApiRateLimit')) {
+    enforceApiRateLimit($pdo, $action);
+}
+
 // Auto-log non-GET actions (excluding login, which is logged manually after session is set)
 if ($action && strpos($action, 'get_') !== 0 && $action !== 'update_location' && $action !== 'login') {
     // Attempt to build a somewhat descriptive message based on action
@@ -96,6 +102,32 @@ if ($action && strpos($action, 'get_') !== 0 && $action !== 'update_location' &&
         $desc .= " (SJ: " . $_POST['surat_jalan'] . ")";
 
     logActivity(strtoupper($action), $desc);
+}
+
+// Centralized API Authentication Guard (Hanya aksi dalam whitelist yang boleh diakses publik)
+$public_actions = ['login', 'get_payment_config', 'submit_payment', 'redeem_license_token'];
+if (!in_array($action, $public_actions, true)) {
+    checkLogin();
+
+    // CSRF Protection: Validasi Origin / Referer untuk POST terautentikasi
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $currentHost = $_SERVER['HTTP_HOST'] ?? '';
+        $expectedHost = strtolower(explode(':', $currentHost)[0]);
+
+        if (!empty($_SERVER['HTTP_ORIGIN'])) {
+            $originHost = strtolower(parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) ?? '');
+            if ($originHost && $originHost !== $expectedHost) {
+                http_response_code(403);
+                die(json_encode(['success' => false, 'error' => 'CSRF Protection: Permintaan lintas domain ditolak.']));
+            }
+        } elseif (!empty($_SERVER['HTTP_REFERER'])) {
+            $refererHost = strtolower(parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) ?? '');
+            if ($refererHost && $refererHost !== $expectedHost) {
+                http_response_code(403);
+                die(json_encode(['success' => false, 'error' => 'CSRF Protection: Permintaan dari sumber tidak dikenal ditolak.']));
+            }
+        }
+    }
 }
 
 // Release session lock for read-only GET requests to enable parallel AJAX processing
@@ -453,9 +485,12 @@ switch ($action) {
             $speedo_num = $_POST['speedometer_start_num'] ?? null;
             $speedo_photo = null;
             if (isset($_FILES['speedometer_start_photo']) && $_FILES['speedometer_start_photo']['error'] === UPLOAD_ERR_OK) {
-                $ext = pathinfo($_FILES['speedometer_start_photo']['name'], PATHINFO_EXTENSION);
-                $speedo_photo = uniqid('speedo_') . '.' . $ext;
-                move_uploaded_file($_FILES['speedometer_start_photo']['tmp_name'], __DIR__ . '/uploads/' . $speedo_photo);
+                $ext = safeUploadExtension($_FILES['speedometer_start_photo']['name']);
+                if ($ext && in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'])) {
+                    $speedo_photo = uniqid('speedo_') . '.' . $ext;
+                    if (!is_dir('uploads')) mkdir('uploads', 0755, true);
+                    move_uploaded_file($_FILES['speedometer_start_photo']['tmp_name'], __DIR__ . '/uploads/' . $speedo_photo);
+                }
             }
             // Get current vehicle assigned to this driver
             $stmtV = $pdo->prepare("SELECT vehicle_id FROM driver_active_vehicles WHERE driver_id = (SELECT driver_id FROM deliveries WHERE id = ?) LIMIT 1");
@@ -512,11 +547,13 @@ switch ($action) {
             $speedo_end_num = $_POST['speedometer_end_num'] ?? null;
             $speedo_end_photo = null;
             if (isset($_FILES['speedometer_end_photo']) && $_FILES['speedometer_end_photo']['error'] === UPLOAD_ERR_OK) {
-                $ext = pathinfo($_FILES['speedometer_end_photo']['name'], PATHINFO_EXTENSION);
-                $speedo_end_photo = uniqid('speedo_end_') . '.' . $ext;
-                if (!is_dir('uploads'))
-                    mkdir('uploads', 0777, true);
-                move_uploaded_file($_FILES['speedometer_end_photo']['tmp_name'], __DIR__ . '/uploads/' . $speedo_end_photo);
+                $ext = safeUploadExtension($_FILES['speedometer_end_photo']['name']);
+                if ($ext && in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'])) {
+                    $speedo_end_photo = uniqid('speedo_end_') . '.' . $ext;
+                    if (!is_dir('uploads'))
+                        mkdir('uploads', 0755, true);
+                    move_uploaded_file($_FILES['speedometer_end_photo']['tmp_name'], __DIR__ . '/uploads/' . $speedo_end_photo);
+                }
             }
 
             $sql = "UPDATE deliveries SET status = ?, end_time = NOW(), receiver_name = COALESCE(NULLIF(?, ''), receiver_name), late_reason = ?, driver_notes = ?, proof_file = ?, speedometer_end_num = ?, speedometer_end_photo = ? WHERE id = ?";
@@ -3424,6 +3461,71 @@ switch ($action) {
         }
         break;
 
+    case 'export_database_backup':
+        checkLogin();
+        if (($_SESSION['role'] ?? '') !== 'controller') {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak: Hanya Super Admin yang berhak mengekspor backup database.']));
+        }
+        try {
+            $stmtTables = $pdo->query("SHOW TABLES");
+            $tables = $stmtTables->fetchAll(PDO::FETCH_COLUMN);
+
+            $dump = "-- TMS Head Office Database Backup\n";
+            $dump .= "-- Generated: " . date('Y-m-d H:i:s') . " WIB\n";
+            $dump .= "-- Generated By: " . ($_SESSION['username'] ?? 'controller') . "\n";
+            $dump .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+
+            foreach ($tables as $t) {
+                // Get CREATE TABLE statement
+                $stmtCreate = $pdo->query("SHOW CREATE TABLE `$t`");
+                $createRow = $stmtCreate->fetch(PDO::FETCH_NUM);
+                $dump .= "DROP TABLE IF EXISTS `$t`;\n";
+                $dump .= $createRow[1] . ";\n\n";
+
+                // Get Table Data
+                $stmtRows = $pdo->query("SELECT * FROM `$t`");
+                $rows = $stmtRows->fetchAll(PDO::FETCH_ASSOC);
+                if (!empty($rows)) {
+                    $cols = array_keys($rows[0]);
+                    $colsEscaped = array_map(function($c) { return "`$c`"; }, $cols);
+                    $colList = implode(', ', $colsEscaped);
+
+                    foreach ($rows as $r) {
+                        $values = [];
+                        foreach ($r as $val) {
+                            if ($val === null) {
+                                $values[] = 'NULL';
+                            } else {
+                                $values[] = $pdo->quote($val);
+                            }
+                        }
+                        $dump .= "INSERT INTO `$t` ($colList) VALUES (" . implode(', ', $values) . ");\n";
+                    }
+                    $dump .= "\n";
+                }
+            }
+
+            $dump .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
+            if (isset($_GET['download']) && $_GET['download'] == '1') {
+                header('Content-Type: application/sql');
+                header('Content-Disposition: attachment; filename="tms_backup_' . date('Ymd_His') . '.sql"');
+                header('Content-Length: ' . strlen($dump));
+                echo $dump;
+                exit();
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Backup berhasil dibuat.',
+                'filename' => 'tms_backup_' . date('Ymd_His') . '.sql',
+                'size_bytes' => strlen($dump)
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Gagal membuat backup: ' . $e->getMessage()]);
+        }
+        break;
+
     case 'truncate_database_table':
         checkLogin();
         if (($_SESSION['role'] ?? '') !== 'controller') {
@@ -3695,7 +3797,288 @@ switch ($action) {
         }
         break;
 
+    case 'get_payment_config':
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        try {
+            $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('payment_bank_name', 'payment_account_number', 'payment_account_holder', 'payment_price_per_month', 'payment_admin_email', 'gemini_api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure')");
+            $config = [
+                'bank_name' => 'BCA',
+                'account_number' => '1234567890',
+                'account_holder' => 'Dhanielo Marthinz',
+                'price_per_month' => 150000,
+                'admin_email' => 'dhanielo.marthinz@gmail.com',
+                'has_gemini' => false,
+                'smtp_host' => '',
+                'smtp_port' => '587',
+                'smtp_user' => '',
+                'smtp_pass' => '',
+                'smtp_secure' => 'tls'
+            ];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if ($row['setting_key'] === 'payment_bank_name') $config['bank_name'] = $row['setting_value'];
+                if ($row['setting_key'] === 'payment_account_number') $config['account_number'] = $row['setting_value'];
+                if ($row['setting_key'] === 'payment_account_holder') $config['account_holder'] = $row['setting_value'];
+                if ($row['setting_key'] === 'payment_price_per_month') $config['price_per_month'] = (int)$row['setting_value'];
+                if ($row['setting_key'] === 'payment_admin_email') $config['admin_email'] = $row['setting_value'];
+                if ($row['setting_key'] === 'gemini_api_key') {
+                    $config['has_gemini'] = !empty(trim((string)$row['setting_value']));
+                    $config['gemini_api_key'] = $row['setting_value'];
+                }
+                if ($row['setting_key'] === 'smtp_host') $config['smtp_host'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_port') $config['smtp_port'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_user') $config['smtp_user'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_pass') $config['smtp_pass'] = $row['setting_value'];
+                if ($row['setting_key'] === 'smtp_secure') $config['smtp_secure'] = $row['setting_value'];
+            }
+
+            // Pricing packages
+            $base = $config['price_per_month'] ?: 150000;
+            $packages = [
+                1 => ['months' => 1, 'name' => '1 Bulan', 'price' => $base, 'discount' => 0],
+                3 => ['months' => 3, 'name' => '3 Bulan (Hemat 5%)', 'price' => round($base * 3 * 0.95), 'discount' => 5],
+                6 => ['months' => 6, 'name' => '6 Bulan (Hemat 10%)', 'price' => round($base * 6 * 0.90), 'discount' => 10],
+                12 => ['months' => 12, 'name' => '1 Tahun (Hemat 17%)', 'price' => round($base * 12 * 0.83), 'discount' => 17]
+            ];
+
+            echo json_encode([
+                'success' => true,
+                'config' => $config,
+                'packages' => $packages
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'submit_payment':
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        try {
+            $months = isset($_POST['months']) ? (int)$_POST['months'] : 0;
+            $email = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
+
+            if ($months <= 0) {
+                die(json_encode(['success' => false, 'error' => 'Wajib memilih durasi bulan perpanjangan lisensi.']));
+            }
+            if (!$email) {
+                die(json_encode(['success' => false, 'error' => 'Alamat email tidak valid. Token lisensi akan dikirimkan ke email ini.']));
+            }
+
+            if (!isset($_FILES['proof_file']) || $_FILES['proof_file']['error'] !== UPLOAD_ERR_OK) {
+                die(json_encode(['success' => false, 'error' => 'Wajib mengunggah foto / screenshot bukti transfer pembayaran.']));
+            }
+
+            $file = $_FILES['proof_file'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+            if (!in_array($ext, $allowedExts)) {
+                die(json_encode(['success' => false, 'error' => 'Format file tidak didukung. Harap upload gambar (JPG, PNG, atau WEBP).']));
+            }
+
+            if ($file['size'] > 12 * 1024 * 1024) {
+                die(json_encode(['success' => false, 'error' => 'Ukuran file gambar bukti transfer maksimal 12MB.']));
+            }
+
+            $uploadDir = __DIR__ . '/uploads/payments/';
+            if (!is_dir($uploadDir)) {
+                @mkdir($uploadDir, 0755, true);
+            }
+
+            $fileName = 'PROOF_' . time() . '_' . uniqid() . '.' . $ext;
+            $destPath = $uploadDir . $fileName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                die(json_encode(['success' => false, 'error' => 'Gagal menyimpan file bukti transfer ke server.']));
+            }
+
+            // Calculate expected price
+            $stmtPrice = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'payment_price_per_month'");
+            $basePrice = $stmtPrice ? (int)$stmtPrice->fetchColumn() : 150000;
+            if ($basePrice <= 0) $basePrice = 150000;
+
+            $totalAmount = $basePrice * $months;
+            if ($months == 3) $totalAmount = round($basePrice * 3 * 0.95);
+            elseif ($months == 6) $totalAmount = round($basePrice * 6 * 0.90);
+            elseif ($months >= 12) $totalAmount = round($basePrice * 12 * 0.83);
+
+            // Execute AI Verification
+            $aiResult = verifyPaymentProofWithAI($destPath, $totalAmount, $months, $pdo);
+
+            if (!$aiResult || empty($aiResult['is_valid'])) {
+                @unlink($destPath);
+                $errSummary = $aiResult['summary'] ?? 'Bukti transfer tidak valid atau gagal diverifikasi oleh sistem AI.';
+                die(json_encode([
+                    'success' => false,
+                    'error' => $errSummary,
+                    'ai_result' => $aiResult
+                ]));
+            }
+
+            // Generate Token
+            $token = generateLicenseToken($pdo);
+            $aiStatus = $aiResult['status'] ?? 'verified';
+            $aiAnalysisJson = json_encode($aiResult, JSON_UNESCAPED_UNICODE);
+
+            $stmtToken = $pdo->prepare("INSERT INTO system_license_tokens (token, months, user_email, amount, payment_proof, ai_status, ai_analysis, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
+            $stmtToken->execute([$token, $months, $email, $totalAmount, $fileName, $aiStatus, $aiAnalysisJson]);
+
+            // Dispatch Notifications
+            $mailToUser = sendTokenToUserEmail($email, $token, $months, $totalAmount, $pdo);
+            $mailToAdmin = sendProofNotificationToAdmin($email, $token, $months, $totalAmount, $fileName, $aiResult, $pdo);
+
+            logActivity('PAYMENT_SUBMITTED', "Pembayaran lisensi ({$months} Bulan) oleh {$email}. Token: {$token}. AI Status: {$aiStatus}");
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Bukti pembayaran berhasil diverifikasi! Token lisensi telah dikirim ke email Anda.',
+                'token' => $token,
+                'months' => $months,
+                'email' => $email,
+                'amount' => $totalAmount,
+                'ai_status' => $aiStatus,
+                'ai_summary' => $aiResult['summary'] ?? 'Verifikasi Berhasil',
+                'confidence' => $aiResult['confidence'] ?? 0.9,
+                'email_user_sent' => $mailToUser,
+                'email_admin_sent' => $mailToAdmin
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'redeem_license_token':
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        try {
+            $rawToken = trim($_POST['token'] ?? '');
+            if (empty($rawToken)) {
+                die(json_encode(['success' => false, 'error' => 'Harap masukkan kode Token Lisensi.']));
+            }
+
+            $token = strtoupper($rawToken);
+
+            $stmt = $pdo->prepare("SELECT * FROM system_license_tokens WHERE token = ?");
+            $stmt->execute([$token]);
+            $tokenData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tokenData) {
+                die(json_encode(['success' => false, 'error' => 'Kode Token tidak ditemukan. Pastikan Anda memasukkan kode token yang benar dari email.']));
+            }
+
+            if ($tokenData['status'] === 'used') {
+                $usedTime = $tokenData['used_at'] ? date('d/m/Y H:i', strtotime($tokenData['used_at'])) : '-';
+                die(json_encode(['success' => false, 'error' => "Token ini sudah pernah digunakan pada {$usedTime}. Silakan lakukan pembayaran baru untuk mendapatkan token."]));
+            }
+
+            if ($tokenData['status'] !== 'active') {
+                die(json_encode(['success' => false, 'error' => 'Token lisensi tidak aktif atau telah dibatalkan.']));
+            }
+
+            $months = (int)$tokenData['months'];
+            if ($months <= 0) $months = 1;
+
+            // Compute new expiry date
+            $stmtLic = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'app_active_until'");
+            $currentVal = $stmtLic ? $stmtLic->fetchColumn() : null;
+
+            $baseTime = time();
+            if ($currentVal && strtotime($currentVal) > time()) {
+                $baseTime = strtotime($currentVal);
+            }
+
+            $newDateStr = date('Y-m-d 23:59:59', strtotime("+{$months} months", $baseTime));
+
+            // Update app_active_until
+            $stmtUpsert = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('app_active_until', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+            $stmtUpsert->execute([$newDateStr, $newDateStr]);
+
+            // Atomic mark token as used (Pencegahan Race Condition / Double-Spend)
+            $ip = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
+            $stmtUsed = $pdo->prepare("UPDATE system_license_tokens SET status = 'used', used_at = NOW(), used_by_ip = ? WHERE id = ? AND status = 'active'");
+            $stmtUsed->execute([$ip, $tokenData['id']]);
+
+            if ($stmtUsed->rowCount() === 0) {
+                die(json_encode(['success' => false, 'error' => 'Token ini sedang atau sudah diproses oleh permintaan lain.']));
+            }
+
+            // Insert license logs
+            $userEmail = $tokenData['user_email'];
+            $extType = "+{$months} Bulan (Token)";
+            $paymentNote = "Aktivasi Token: {$token} (Oleh: {$userEmail})";
+            $stmtLog = $pdo->prepare("INSERT INTO system_license_logs (extended_by, extension_type, previous_expiry, new_expiry, payment_notes) VALUES (?, ?, ?, ?, ?)");
+            $stmtLog->execute(["{$userEmail} (Token)", $extType, $currentVal, $newDateStr, $paymentNote]);
+
+            logActivity('TOKEN_REDEEMED', "Token lisensi {$token} berhasil diaktivasi oleh {$userEmail}. Masa aktif diperpanjang hingga {$newDateStr}");
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Token berhasil diaktivasi! Masa aktif sistem bertambah {$months} bulan sampai " . date('d M Y', strtotime($newDateStr)),
+                'active_until' => $newDateStr,
+                'months' => $months
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'get_license_tokens':
+        checkLogin();
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $stmt = $pdo->query("SELECT id, token, months, user_email, amount, payment_proof, ai_status, ai_analysis, status, created_at, used_at FROM system_license_tokens ORDER BY id DESC LIMIT 50");
+            $tokens = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            echo json_encode([
+                'success' => true,
+                'tokens' => $tokens
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'update_payment_settings':
+        checkLogin();
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $keys = [
+                'payment_bank_name',
+                'payment_account_number',
+                'payment_account_holder',
+                'payment_price_per_month',
+                'payment_admin_email',
+                'gemini_api_key',
+                'smtp_host',
+                'smtp_port',
+                'smtp_user',
+                'smtp_pass',
+                'smtp_secure'
+            ];
+
+            $stmtUpsert = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+
+            foreach ($keys as $k) {
+                if (isset($_POST[$k])) {
+                    $val = trim($_POST[$k]);
+                    $stmtUpsert->execute([$k, $val, $val]);
+                }
+            }
+
+            logActivity('UPDATE_PAYMENT_SETTINGS', "Pengaturan pembayaran dan AI diperbarui.");
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Pengaturan pembayaran dan AI berhasil disimpan!'
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
     default:
         echo json_encode(['error' => 'Invalid action']);
         break;
 }
+

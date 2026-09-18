@@ -3,28 +3,35 @@ RewriteEngine On
 # Disable Directory Indexing
 Options -Indexes
 
-# Security Headers
+# Security Headers (Defense-in-Depth)
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "camera=(self), geolocation=(self), microphone=()"
 </IfModule>
 
-# Protect Sensitive Files
-<FilesMatch "(?i)\.(env|log|sql|bak|dmp|ini|sh|config\.php)$">
-    Order allow,deny
-    Deny from all
+# Protect Sensitive Files (Apache 2.2 & 2.4 Dual Compatible)
+<FilesMatch "(?i)\.(env|log|sql|bak|dmp|ini|sh|config\.php|json|yml|yaml|md|text)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
 </FilesMatch>
 
-# Prevent access to hidden files (e.g. .git)
+# Prevent access to hidden files & directories (e.g. .git, .env)
 <FilesMatch "^\.">
-    Order allow,deny
-    Deny from all
-</FilesMatch>
-<FilesMatch "^\.htaccess$">
-    Order allow,deny
-    Deny from all
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
 </FilesMatch>
 
 # 1. Menghilangkan .php dari URL (Redirect jika akses manual .php)

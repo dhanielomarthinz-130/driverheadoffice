@@ -421,6 +421,120 @@ $current_page = 'system_license.php';
                     </table>
                 </div>
             </div>
+
+            <!-- CARD PENGATURAN PEMBAYARAN, AI & EMAIL -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; margin-bottom: 2rem;">
+                <div class="card">
+                    <div class="card-title">
+                        <span>Pengaturan Rekening Pembayaran & Harga</span>
+                        <span class="material-symbols-outlined" style="color: var(--primary);">payments</span>
+                    </div>
+
+                    <form id="paymentConfigForm">
+                        <div class="form-group">
+                            <label for="cfgBankName">Nama Bank Tujuan</label>
+                            <input type="text" id="cfgBankName" name="payment_bank_name" class="form-control" placeholder="Contoh: BCA, Mandiri, BRI" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgAccountNum">Nomor Rekening</label>
+                            <input type="text" id="cfgAccountNum" name="payment_account_number" class="form-control" placeholder="Nomor rekening transfer" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgAccountHolder">Atas Nama Rekening</label>
+                            <input type="text" id="cfgAccountHolder" name="payment_account_holder" class="form-control" placeholder="Nama pemilik rekening" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgPrice">Tarif Lisensi / Bulan (Rp)</label>
+                            <input type="number" id="cfgPrice" name="payment_price_per_month" class="form-control" placeholder="150000" min="10000" step="1000" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgAdminEmail">Email Notifikasi Admin (Penerima Bukti)</label>
+                            <input type="email" id="cfgAdminEmail" name="payment_admin_email" class="form-control" placeholder="dhanielo.marthinz@gmail.com" required>
+                        </div>
+
+                        <button type="submit" id="btnSavePaymentConfig" class="btn-submit-main">
+                            <span class="material-symbols-outlined">save</span>
+                            Simpan Rekening & Harga
+                        </button>
+                    </form>
+                </div>
+
+                <!-- CARD PENGATURAN AI & SMTP -->
+                <div class="card">
+                    <div class="card-title">
+                        <span>Integrasi AI Verifikator & SMTP Mailer</span>
+                        <span class="material-symbols-outlined" style="color: var(--primary);">smart_toy</span>
+                    </div>
+
+                    <form id="aiSmtpForm">
+                        <div class="form-group">
+                            <label for="cfgGeminiKey">Google Gemini API Key (Verifikasi Struk AI)</label>
+                            <input type="password" id="cfgGeminiKey" name="gemini_api_key" class="form-control" placeholder="AIzaSy...">
+                            <small style="color: var(--text-sub); font-size: 0.75rem; margin-top: 4px; display: block;">
+                                Digunakan untuk memeriksa keaslian foto struk m-banking / ATM secara otomatis. Kosongkan jika ingin memakai heuristik bawaan.
+                            </small>
+                        </div>
+
+                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-heading); margin-top: 1rem; margin-bottom: 8px;">
+                            Konfigurasi SMTP Pengiriman Email (Opsional):
+                        </div>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px;">
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">SMTP Host</label>
+                                <input type="text" id="cfgSmtpHost" name="smtp_host" class="form-control" placeholder="smtp.gmail.com">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">Port</label>
+                                <input type="number" id="cfgSmtpPort" name="smtp_port" class="form-control" placeholder="587">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">Username / Email SMTP</label>
+                                <input type="text" id="cfgSmtpUser" name="smtp_user" class="form-control" placeholder="user@gmail.com">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">Password / App Password</label>
+                                <input type="password" id="cfgSmtpPass" name="smtp_pass" class="form-control" placeholder="••••••••">
+                            </div>
+                        </div>
+
+                        <button type="submit" id="btnSaveAiSmtp" class="btn-submit-main" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
+                            <span class="material-symbols-outlined">save</span>
+                            Simpan Pengaturan AI & Email
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- CARD DAFTAR TOKEN & PEMBAYARAN MASUK -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-title">
+                    <span>Daftar Token Lisensi & Pembayaran Masuk (AI Verified)</span>
+                    <span class="material-symbols-outlined" style="color: var(--primary);">vpn_key</span>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th>Waktu / ID</th>
+                                <th>Token Lisensi</th>
+                                <th>Durasi & Nominal</th>
+                                <th>Email Pembeli</th>
+                                <th>Bukti Transfer</th>
+                                <th>Analisis AI</th>
+                                <th>Status Token</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tokensTableBody">
+                            <tr>
+                                <td colspan="7" style="text-align:center; color:var(--text-sub); padding:16px;">Memuat data token...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -795,10 +909,141 @@ $current_page = 'system_license.php';
             }
         };
 
+        async function fetchPaymentSettings() {
+            try {
+                const res = await fetch('./api.php?action=get_payment_config');
+                const data = await res.json();
+                if (data.success && data.config) {
+                    const c = data.config;
+                    document.getElementById('cfgBankName').value = c.bank_name || '';
+                    document.getElementById('cfgAccountNum').value = c.account_number || '';
+                    document.getElementById('cfgAccountHolder').value = c.account_holder || '';
+                    document.getElementById('cfgPrice').value = c.price_per_month || 150000;
+                    document.getElementById('cfgAdminEmail').value = c.admin_email || '';
+
+                    if (c.gemini_api_key) {
+                        document.getElementById('cfgGeminiKey').value = c.gemini_api_key;
+                    }
+                    document.getElementById('cfgSmtpHost').value = c.smtp_host || '';
+                    document.getElementById('cfgSmtpPort').value = c.smtp_port || 587;
+                    document.getElementById('cfgSmtpUser').value = c.smtp_user || '';
+                    document.getElementById('cfgSmtpPass').value = c.smtp_pass || '';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function fetchLicenseTokens() {
+            try {
+                const res = await fetch('./api.php?action=get_license_tokens');
+                const data = await res.json();
+                const tbody = document.getElementById('tokensTableBody');
+
+                if (data.success && Array.isArray(data.tokens)) {
+                    if (data.tokens.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-sub); padding:16px;">Belum ada pembayaran atau token yang diterbitkan.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = data.tokens.map(t => {
+                        const dateStr = new Date(t.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+                        const statusBadge = (t.status === 'active')
+                            ? '<span style="background:#dcfce7; color:#15803d; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">AKTIF</span>'
+                            : '<span style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">TERPAKAI</span>';
+                        
+                        const aiBadge = (t.ai_status === 'verified')
+                            ? '<span style="color:#10b981; font-weight:700;">✓ Verified</span>'
+                            : '<span style="color:#f59e0b; font-weight:700;">⚠ Flagged</span>';
+
+                        const proofLink = t.payment_proof 
+                            ? `<a href="./uploads/payments/${encodeURIComponent(t.payment_proof)}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-outlined" style="font-size:16px;">receipt_long</span> Lihat Struk</a>`
+                            : '<span style="color:var(--text-sub);">-</span>';
+
+                        const formattedAmount = 'Rp ' + Number(t.amount).toLocaleString('id-ID');
+
+                        return `
+                            <tr>
+                                <td>
+                                    <div style="font-weight:700; color:var(--text-heading);">#TOK-${String(t.id).padStart(4, '0')}</div>
+                                    <div style="font-size:0.72rem; color:var(--text-sub);">${dateStr}</div>
+                                </td>
+                                <td>
+                                    <div style="font-family:monospace; font-weight:800; color:var(--primary); letter-spacing:1px;">${t.token}</div>
+                                </td>
+                                <td>
+                                    <div style="font-weight:700;">${t.months} Bulan</div>
+                                    <div style="font-size:0.75rem; color:var(--text-sub);">${formattedAmount}</div>
+                                </td>
+                                <td>
+                                    <span style="font-weight:600; color:var(--text-heading);">${t.user_email}</span>
+                                </td>
+                                <td>${proofLink}</td>
+                                <td>${aiBadge}</td>
+                                <td>${statusBadge}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger); text-align:center;">${data.error || 'Gagal memuat token'}</td></tr>`;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('paymentConfigForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSavePaymentConfig');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite;">progress_activity</span> Menyimpan...';
+
+            try {
+                const res = await fetch('./api.php?action=update_payment_settings', { method: 'POST', body: new FormData(e.target) });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchPaymentSettings();
+                } else {
+                    showToast(data.error || 'Gagal menyimpan pengaturan', 'error');
+                }
+            } catch (err) {
+                showToast('Terjadi gangguan jaringan', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined">save</span> Simpan Rekening & Harga';
+            }
+        };
+
+        document.getElementById('aiSmtpForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSaveAiSmtp');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite;">progress_activity</span> Menyimpan...';
+
+            try {
+                const res = await fetch('./api.php?action=update_payment_settings', { method: 'POST', body: new FormData(e.target) });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchPaymentSettings();
+                } else {
+                    showToast(data.error || 'Gagal menyimpan pengaturan AI', 'error');
+                }
+            } catch (err) {
+                showToast('Terjadi gangguan jaringan', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined">save</span> Simpan Pengaturan AI & Email';
+            }
+        };
+
         window.addEventListener('DOMContentLoaded', () => {
             fetchLicenseData();
             fetchLicenseManagers();
             fetchLicenseLogs();
+            fetchPaymentSettings();
+            fetchLicenseTokens();
         });
     </script>
 </body>

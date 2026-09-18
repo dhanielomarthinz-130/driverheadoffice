@@ -4561,7 +4561,7 @@ $init_exp = 0;
                 document.getElementById('edit_origin_name').value = loc ? loc.name : '';
             }
 
-            const ADMIN_NAME = '<?php echo $_SESSION['name'] ?? "Admin"; ?>';
+            const ADMIN_NAME = <?php echo json_encode($_SESSION['name'] ?? 'Admin'); ?>;
 
             // Global storage for incremental file selection
             let selectedFiles = {
