@@ -33,17 +33,3 @@ jobs:
             testsprite_tests/**
             README.md
 
-      - name: 🗄️ Trigger Database Migration (if WEBSITE_URL secret is set)
-        env:
-          WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
-          MIGRATE_TOKEN: ${{ secrets.MIGRATE_TOKEN }}
-        run: |
-          if [ -n "$WEBSITE_URL" ]; then
-            TOKEN="${MIGRATE_TOKEN:-tms_secret_migration_key_8899}"
-            # Remove trailing slash if any
-            CLEAN_URL="${WEBSITE_URL%/}"
-            echo "Memanggil migrasi database ke: $CLEAN_URL/migrate.php"
-            curl -s -L "$CLEAN_URL/migrate.php?token=$TOKEN" || true
-          else
-            echo "Secret WEBSITE_URL belum diatur, melewati trigger migrasi otomatis."
-          fi
