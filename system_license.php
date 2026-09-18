@@ -653,6 +653,65 @@ $current_page = 'system_license.php';
             };
         }
 
+        // ===== CLIPBOARD COPY HELPERS =====
+        function copyText(text, successMsg = 'Tersalin!') {
+            if (!text) return;
+
+            const fallbackCopy = (t) => {
+                const el = document.createElement('textarea');
+                el.value = t;
+                el.setAttribute('readonly', '');
+                el.style.position = 'fixed';
+                el.style.left = '-9999px';
+                document.body.appendChild(el);
+                el.focus();
+                el.select();
+                try {
+                    const ok = document.execCommand('copy');
+                    if (ok) {
+                        showToast(successMsg, 'success');
+                    } else {
+                        showToast('Gagal menyalin token ke clipboard', 'error');
+                    }
+                } catch (err) {
+                    showToast('Gagal menyalin token ke clipboard', 'error');
+                }
+                document.body.removeChild(el);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast(successMsg, 'success');
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function copyTokenResult() {
+            const tokenEl = document.getElementById('tokenResultCode');
+            const token = lastGeneratedToken || (tokenEl ? tokenEl.textContent.trim() : '');
+            if (!token || token === 'TMS-XXXX-XXXX-XXXX') {
+                showToast('Tidak ada token yang dapat disalin', 'error');
+                return;
+            }
+
+            copyText(token, `Kode token ${token} berhasil disalin!`);
+
+            const btn = document.getElementById('btnModalCopyToken');
+            if (btn) {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">check</span><span>Kode Token Tersalin!</span>';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.style.background = '#4f46e5';
+                }, 2000);
+            }
+        }
+
         // ===== DATA FETCH & ACTIONS =====
         async function fetchLicenseData() {
             try {
@@ -1292,7 +1351,7 @@ $current_page = 'system_license.php';
                 <div id="tokenResultCode" style="font-family:monospace; font-size:1.5rem; font-weight:800; color:#818cf8; letter-spacing:2px;">TMS-XXXX-XXXX-XXXX</div>
             </div>
             <div style="display:flex; flex-direction:column; gap:10px;">
-                <button type="button" onclick="copyTokenResult()" style="background:#4f46e5; color:#ffffff; border:none; padding:12px 16px; border-radius:12px; font-weight:700; font-size:0.9rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <button type="button" id="btnModalCopyToken" onclick="copyTokenResult()" style="background:#4f46e5; color:#ffffff; border:none; padding:12px 16px; border-radius:12px; font-weight:700; font-size:0.9rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                     <span class="material-symbols-outlined" style="font-size:20px;">content_copy</span>
                     <span>Salin Kode Token</span>
                 </button>
