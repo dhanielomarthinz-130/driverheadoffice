@@ -759,41 +759,47 @@ $basePrice = $config['price_per_month'] ?: 150000;
         </div>
     </div>
 
-    <!-- MODAL SUKSES DENGAN TOKEN -->
+    <!-- MODAL SUKSES PENGIRIMAN BUKTI (MENUNGGU VERIFIKASI ADMIN) -->
     <div class="modal-overlay" id="successModal">
         <div class="modal-card">
-            <div style="width: 72px; height: 72px; background: rgba(16, 185, 129, 0.15); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--success); margin-bottom: 1.25rem;">
-                <span class="material-symbols-outlined" style="font-size: 42px;">verified_user</span>
+            <div style="width: 72px; height: 72px; background: rgba(99, 102, 241, 0.15); border: 2px solid rgba(99, 102, 241, 0.4); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); margin-bottom: 1.25rem;">
+                <span class="material-symbols-outlined" style="font-size: 42px;">mark_email_read</span>
             </div>
 
-            <h2 style="font-size: 1.45rem; font-weight: 800; color: #ffffff; margin-bottom: 6px;">Pembayaran & AI Lolos Verifikasi!</h2>
+            <h2 style="font-size: 1.45rem; font-weight: 800; color: #ffffff; margin-bottom: 6px;">Bukti Pembayaran Terkirim!</h2>
             <p style="font-size: 0.88rem; color: var(--text-sub); line-height: 1.5;" id="successSummary">
-                Struk transfer Anda dinyatakan valid dan asli. Token aktivasi telah dikirimkan ke email Anda.
+                Laporan bukti transfer telah kami kirimkan ke Administrator untuk diverifikasi. Token aktivasi akan segera dibuatkan dan dikirimkan ke email Anda.
             </p>
 
-            <div class="token-display-box">
-                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-sub); text-transform: uppercase; margin-bottom: 6px;">
-                    KODE TOKEN AKTIVASI ANDA:
+            <!-- CARD DETAIL STATUS PENDING -->
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; margin: 1.25rem 0; text-align: left; font-size: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); padding-bottom: 6px;">
+                    <span style="color: var(--text-sub);">Status Verifikasi:</span>
+                    <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">MENUNGGU PERSETUJUAN ADMIN</span>
                 </div>
-                <div class="token-code" id="modalTokenCode">TMS-XXXX-XXXX-XXXX</div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); padding-bottom: 6px;">
+                    <span style="color: var(--text-sub);">Email Penerima Token:</span>
+                    <span id="modalEmailText" style="color: #ffffff; font-weight: 700;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-sub);">Paket Pilihan:</span>
+                    <span id="modalPackageText" style="color: #ffffff; font-weight: 700;">-</span>
+                </div>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 1.5rem; flex-direction: column;">
-                <button type="button" class="btn-submit" id="btnActivateNow" style="background: linear-gradient(135deg, #10b981, #059669);">
-                    <span class="material-symbols-outlined">key</span>
-                    <span>Aktivasi Token Sekarang</span>
-                </button>
-                <button type="button" class="btn-copy" onclick="copyGeneratedToken()" style="justify-content: center; height: 44px; font-size: 0.9rem;">
-                    <span class="material-symbols-outlined">content_copy</span>
-                    <span>Salin Kode Token</span>
-                </button>
+            <div style="display: flex; gap: 10px; margin-top: 1rem; flex-direction: column;">
+                <a id="btnWaConfirm" href="https://wa.me/62822107031118" target="_blank" rel="noopener noreferrer" class="btn-submit" style="background: linear-gradient(135deg, #25D366, #128C7E); text-decoration: none; justify-content: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: currentColor;"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.592 2.654-.696c1.001.574 1.761.855 2.806.855 3.18 0 5.767-2.587 5.767-5.766.001-3.18-2.585-5.768-5.767-5.768zm3.376 8.204c-.149.418-.752.793-1.042.845-.275.048-.624.088-1.795-.398-1.503-.623-2.473-2.15-2.548-2.25-.075-.101-.611-.813-.611-1.549 0-.736.386-1.098.523-1.248.137-.149.3-.187.4-.187.1 0 .2 0 .287.005.093.004.218-.035.341.261.129.308.439 1.07.478 1.149.039.078.064.17.014.27-.05.099-.075.161-.149.248-.075.086-.157.193-.224.259-.075.074-.153.155-.066.304.087.149.387.639.83 1.033.57.507 1.05.664 1.2.738.149.075.237.062.325-.038.087-.1.374-.436.474-.585.1-.149.2-.124.336-.074.137.05.868.409 1.018.484.149.075.249.112.286.174.037.063.037.362-.112.78zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.954-1.399C8.423 21.493 10.15 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+                    <span>Konfirmasi Cepat via WhatsApp (0822-1070-31118)</span>
+                </a>
+                <a href="expired" class="btn-copy" style="justify-content: center; height: 44px; font-size: 0.9rem; text-decoration: none;">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    <span>Kembali ke Halaman Expired</span>
+                </a>
             </div>
 
             <div style="font-size: 0.78rem; color: #64748b; margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 10px;">
-                Bukti pembayaran juga telah diteruskan ke administrator <strong>dhanielo.marthinz@gmail.com</strong>
-                <div style="margin-top: 8px;">
-                    Butuh bantuan aktivasi cepat? <a href="https://wa.me/62822107031118?text=Halo%20Admin%20TMS,%20saya%20sudah%20melakukan%20pembayaran%20dan%20mendapatkan%20token." target="_blank" rel="noopener noreferrer" style="color: #34d399; font-weight: 700; text-decoration: underline;">Chat WhatsApp Admin (0822-1070-31118)</a>
-                </div>
+                Notifikasi bukti pembayaran juga telah terkirim otomatis ke <strong>dhanielo.marthinz@gmail.com</strong>
             </div>
         </div>
     </div>
@@ -917,17 +923,16 @@ $basePrice = $config['price_per_month'] ?: 150000;
                 const data = await res.json();
 
                 if (data.success) {
-                    generatedToken = data.token;
-                    document.getElementById('modalTokenCode').textContent = data.token;
+                    document.getElementById('modalEmailText').textContent = data.email;
+                    document.getElementById('modalPackageText').textContent = `${data.months} Bulan (Rp ${Number(data.amount).toLocaleString('id-ID')})`;
                     document.getElementById('successSummary').innerHTML = `
-                        Bukti transfer Anda untuk paket <strong>${data.months} Bulan</strong> berhasil diverifikasi sah oleh AI.<br>
-                        Token telah dikirim ke: <strong>${data.email}</strong>.
+                        Laporan bukti transfer untuk paket <strong>${data.months} Bulan</strong> telah berhasil dikirimkan ke Admin.<br>
+                        Admin akan segera memeriksa bukti transfer dan menerbitkan Token Lisensi ke email Anda (<strong>${data.email}</strong>).
                     `;
 
-                    // Configure activation button shortcut
-                    document.getElementById('btnActivateNow').onclick = () => {
-                        window.location.href = `expired?token=${encodeURIComponent(data.token)}`;
-                    };
+                    // Pre-fill WhatsApp confirmation message
+                    const waText = encodeURIComponent(`Halo Admin TMS, saya baru saja transfer dan submit bukti pembayaran lisensi TMS paket ${data.months} Bulan (Rp ${Number(data.amount).toLocaleString('id-ID')}) dengan email: ${data.email}. Mohon dicek dan dikirimkan token aktivasinya.`);
+                    document.getElementById('btnWaConfirm').href = `https://wa.me/62822107031118?text=${waText}`;
 
                     document.getElementById('successModal').classList.add('active');
                 } else {

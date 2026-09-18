@@ -3900,44 +3900,34 @@ switch ($action) {
             elseif ($months == 6) $totalAmount = round($basePrice * 6 * 0.90);
             elseif ($months >= 12) $totalAmount = round($basePrice * 12 * 0.83);
 
-            // Execute AI Verification
+            // Execute AI Verification (Preliminary Analysis)
             $aiResult = verifyPaymentProofWithAI($destPath, $totalAmount, $months, $pdo);
-
-            if (!$aiResult || empty($aiResult['is_valid'])) {
-                @unlink($destPath);
-                $errSummary = $aiResult['summary'] ?? 'Bukti transfer tidak valid atau gagal diverifikasi oleh sistem AI.';
-                die(json_encode([
-                    'success' => false,
-                    'error' => $errSummary,
-                    'ai_result' => $aiResult
-                ]));
-            }
-
-            // Generate Token
-            $token = generateLicenseToken($pdo);
-            $aiStatus = $aiResult['status'] ?? 'verified';
+            $aiStatus = (!empty($aiResult['is_valid'])) ? 'verified' : 'flagged';
             $aiAnalysisJson = json_encode($aiResult, JSON_UNESCAPED_UNICODE);
 
-            $stmtToken = $pdo->prepare("INSERT INTO system_license_tokens (token, months, user_email, amount, payment_proof, ai_status, ai_analysis, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
-            $stmtToken->execute([$token, $months, $email, $totalAmount, $fileName, $aiStatus, $aiAnalysisJson]);
+            // Generate Temporary Pending Reference Code (real token generated when Admin approves)
+            $pendingToken = 'PENDING-' . strtoupper(bin2hex(random_bytes(5)));
 
-            // Dispatch Notifications
-            $mailToUser = sendTokenToUserEmail($email, $token, $months, $totalAmount, $pdo);
-            $mailToAdmin = sendProofNotificationToAdmin($email, $token, $months, $totalAmount, $fileName, $aiResult, $pdo);
+            $stmtToken = $pdo->prepare("INSERT INTO system_license_tokens (token, months, user_email, amount, payment_proof, ai_status, ai_analysis, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
+            $stmtToken->execute([$pendingToken, $months, $email, $totalAmount, $fileName, $aiStatus, $aiAnalysisJson]);
+            $insertedId = $pdo->lastInsertId();
 
-            logActivity('PAYMENT_SUBMITTED', "Pembayaran lisensi ({$months} Bulan) oleh {$email}. Token: {$token}. AI Status: {$aiStatus}");
+            // Dispatch Report to Administrator Only
+            $mailToAdmin = sendProofNotificationToAdmin($email, $pendingToken, $months, $totalAmount, $fileName, $aiResult, $pdo);
+
+            logActivity('PAYMENT_SUBMITTED', "Bukti pembayaran lisensi ({$months} Bulan) oleh {$email} dikirimkan (ID #{$insertedId}, Status: Menunggu Verifikasi Admin).");
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Bukti pembayaran berhasil diverifikasi! Token lisensi telah dikirim ke email Anda.',
-                'token' => $token,
+                'status' => 'pending',
+                'message' => 'Bukti transfer berhasil dikirimkan! Laporan telah diteruskan ke Admin untuk diverifikasi. Token aktivasi akan segera dibuatkan dan dikirimkan ke email Anda.',
+                'id' => $insertedId,
                 'months' => $months,
                 'email' => $email,
                 'amount' => $totalAmount,
                 'ai_status' => $aiStatus,
-                'ai_summary' => $aiResult['summary'] ?? 'Verifikasi Berhasil',
-                'confidence' => $aiResult['confidence'] ?? 0.9,
-                'email_user_sent' => $mailToUser,
+                'ai_summary' => $aiResult['summary'] ?? 'Menunggu Verifikasi Admin',
+                'confidence' => $aiResult['confidence'] ?? 0.8,
                 'email_admin_sent' => $mailToAdmin
             ]);
         } catch (Exception $e) {
@@ -4031,6 +4021,143 @@ switch ($action) {
             echo json_encode([
                 'success' => true,
                 'tokens' => $tokens
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'approve_payment_token':
+        checkLogin();
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                die(json_encode(['success' => false, 'error' => 'ID transaksi pembayaran tidak valid.']));
+            }
+
+            $stmt = $pdo->prepare("SELECT * FROM system_license_tokens WHERE id = ?");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                die(json_encode(['success' => false, 'error' => 'Data pembayaran tidak ditemukan.']));
+            }
+
+            if ($row['status'] === 'used') {
+                die(json_encode(['success' => false, 'error' => 'Token untuk transaksi ini sudah pernah digunakan.']));
+            }
+
+            // Generate cryptographically unique Token
+            $newToken = generateLicenseToken($pdo);
+
+            $stmtUpd = $pdo->prepare("UPDATE system_license_tokens SET token = ?, status = 'active' WHERE id = ?");
+            $stmtUpd->execute([$newToken, $id]);
+
+            // Dispatch Token Email to Buyer
+            $mailSent = sendTokenToUserEmail($row['user_email'], $newToken, (int)$row['months'], (float)$row['amount'], $pdo);
+
+            $adminName = $_SESSION['username'] ?? 'admin';
+            logActivity('PAYMENT_APPROVED', "Admin {$adminName} menyetujui transaksi #{$id}. Token {$newToken} diterbitkan untuk {$row['user_email']}.");
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Pembayaran disetujui! Token {$newToken} berhasil diterbitkan dan dikirimkan ke {$row['user_email']}.",
+                'token' => $newToken,
+                'email' => $row['user_email'],
+                'months' => $row['months'],
+                'amount' => $row['amount'],
+                'mail_sent' => $mailSent
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'reject_payment_token':
+        checkLogin();
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                die(json_encode(['success' => false, 'error' => 'ID pembayaran tidak valid.']));
+            }
+
+            $stmtUpd = $pdo->prepare("UPDATE system_license_tokens SET status = 'rejected' WHERE id = ?");
+            $stmtUpd->execute([$id]);
+
+            $adminName = $_SESSION['username'] ?? 'admin';
+            logActivity('PAYMENT_REJECTED', "Admin {$adminName} menolak bukti pembayaran ID #{$id}.");
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Bukti pembayaran berhasil ditolak.'
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'revoke_system_license':
+        checkLogin();
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $stmtCur = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'app_active_until'");
+            $prevDate = $stmtCur ? $stmtCur->fetchColumn() : date('Y-m-d H:i:s');
+
+            // Set expiry to yesterday (instant deactivation/expired status)
+            $pastDate = date('Y-m-d H:i:s', strtotime('-1 day'));
+            $stmtUpd = $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'app_active_until'");
+            $stmtUpd->execute([$pastDate]);
+
+            $adminUser = $_SESSION['username'] ?? 'daniel';
+            try {
+                $logStmt = $pdo->prepare("INSERT INTO system_license_logs (action_type, previous_until, new_until, notes, admin_username) VALUES ('revocation', ?, ?, 'Lisensi sistem dinonaktifkan / dikunci manual oleh Admin', ?)");
+                $logStmt->execute([$prevDate, $pastDate, $adminUser]);
+            } catch (Exception $e) {}
+
+            logActivity('LICENSE_REVOKED', "Masa aktif sistem dibatalkan secara manual oleh {$adminUser}. Sistem sekarang terkunci/expired.");
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Masa aktif sistem berhasil dibatalkan secara manual! Status sistem sekarang EXPIRED dan seluruh akses pengguna terkunci.'
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'resend_token_email':
+        checkLogin();
+        if (function_exists('ensureLicenseTablesExist')) ensureLicenseTablesExist($pdo);
+        if (!canManageSystemLicense()) {
+            die(json_encode(['success' => false, 'error' => 'Akses ditolak']));
+        }
+        try {
+            $id = (int)($_POST['id'] ?? 0);
+            $stmt = $pdo->prepare("SELECT * FROM system_license_tokens WHERE id = ?");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row || empty($row['token']) || strpos($row['token'], 'PENDING-') === 0) {
+                die(json_encode(['success' => false, 'error' => 'Token belum dibuat/disetujui untuk transaksi ini.']));
+            }
+
+            $mailSent = sendTokenToUserEmail($row['user_email'], $row['token'], (int)$row['months'], (float)$row['amount'], $pdo);
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Email token aktivasi berhasil dikirimkan ulang ke {$row['user_email']}.",
+                'mail_sent' => $mailSent
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);

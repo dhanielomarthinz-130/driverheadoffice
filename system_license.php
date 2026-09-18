@@ -305,6 +305,13 @@ $current_page = 'system_license.php';
                             -
                         </div>
                     </div>
+
+                    <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
+                        <button type="button" id="btnRevokeLicense" onclick="confirmRevokeLicense()" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 12px; padding: 10px 16px; font-weight: 700; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; font-size: 0.82rem;">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">block</span>
+                            <span>Batalkan / Kunci Pemakaian Sistem Sekarang (Set Expired)</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- CARD PERPANJANG INSTAN -->
@@ -525,11 +532,12 @@ $current_page = 'system_license.php';
                                 <th>Bukti Transfer</th>
                                 <th>Analisis AI</th>
                                 <th>Status Token</th>
+                                <th style="text-align: center;">Aksi Admin</th>
                             </tr>
                         </thead>
                         <tbody id="tokensTableBody">
                             <tr>
-                                <td colspan="7" style="text-align:center; color:var(--text-sub); padding:16px;">Memuat data token...</td>
+                                <td colspan="8" style="text-align:center; color:var(--text-sub); padding:16px;">Memuat data token...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -942,15 +950,56 @@ $current_page = 'system_license.php';
 
                 if (data.success && Array.isArray(data.tokens)) {
                     if (data.tokens.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-sub); padding:16px;">Belum ada pembayaran atau token yang diterbitkan.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-sub); padding:16px;">Belum ada pembayaran atau token yang diterbitkan.</td></tr>';
                         return;
                     }
 
                     tbody.innerHTML = data.tokens.map(t => {
                         const dateStr = new Date(t.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
-                        const statusBadge = (t.status === 'active')
-                            ? '<span style="background:#dcfce7; color:#15803d; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">AKTIF</span>'
-                            : '<span style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">TERPAKAI</span>';
+                        
+                        let statusBadge = '';
+                        let tokenDisplay = '';
+                        let actionsHtml = '';
+
+                        if (t.status === 'pending') {
+                            statusBadge = '<span style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">MENUNGGU PERSETUJUAN</span>';
+                            tokenDisplay = '<span style="color:#d97706; font-style:italic; font-size:0.8rem; font-weight:700;"><span class="material-symbols-outlined" style="font-size:14px; vertical-align:-2px;">hourglass_empty</span> Menunggu Otorisasi</span>';
+                            actionsHtml = `
+                                <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+                                    <button type="button" onclick="approvePayment(${t.id}, '${t.user_email}', ${t.months})" style="background:#10b981; color:#ffffff; border:none; padding:6px 10px; border-radius:8px; font-weight:700; font-size:0.75rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Setujui dan buatkan Token">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">check_circle</span>
+                                        <span>Setujui & Buat Token</span>
+                                    </button>
+                                    <button type="button" onclick="rejectPayment(${t.id})" style="background:#fee2e2; color:#ef4444; border:1px solid #fca5a5; padding:6px 10px; border-radius:8px; font-weight:700; font-size:0.75rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Tolak bukti transfer">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">cancel</span>
+                                        <span>Tolak</span>
+                                    </button>
+                                </div>
+                            `;
+                        } else if (t.status === 'active') {
+                            statusBadge = '<span style="background:#dcfce7; color:#15803d; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">AKTIF (BELUM DIPAKAI)</span>';
+                            tokenDisplay = `<div style="font-family:monospace; font-weight:800; color:var(--primary); letter-spacing:1px;">${t.token}</div>`;
+                            actionsHtml = `
+                                <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+                                    <button type="button" onclick="copyText('${t.token}', 'Token berhasil disalin!')" style="background:#e0e7ff; color:#4338ca; border:none; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                        <span class="material-symbols-outlined" style="font-size:14px;">content_copy</span>
+                                        <span>Salin</span>
+                                    </button>
+                                    <button type="button" onclick="resendTokenEmail(${t.id})" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:5px 8px; border-radius:6px; font-weight:700; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                        <span class="material-symbols-outlined" style="font-size:14px;">mail</span>
+                                        <span>Kirim Ulang Email</span>
+                                    </button>
+                                </div>
+                            `;
+                        } else if (t.status === 'rejected') {
+                            statusBadge = '<span style="background:#fee2e2; color:#ef4444; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">DITOLAK</span>';
+                            tokenDisplay = '<span style="color:#ef4444; font-size:0.8rem;">Ditolak</span>';
+                            actionsHtml = '<span style="font-size:0.75rem; color:#ef4444;">-</span>';
+                        } else {
+                            statusBadge = '<span style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">TERPAKAI</span>';
+                            tokenDisplay = `<div style="font-family:monospace; font-weight:700; color:#64748b; text-decoration:line-through;">${t.token}</div>`;
+                            actionsHtml = '<span style="font-size:0.75rem; color:#94a3b8;">Telah Digunakan</span>';
+                        }
                         
                         const aiBadge = (t.ai_status === 'verified')
                             ? '<span style="color:#10b981; font-weight:700;">✓ Verified</span>'
@@ -968,9 +1017,7 @@ $current_page = 'system_license.php';
                                     <div style="font-weight:700; color:var(--text-heading);">#TOK-${String(t.id).padStart(4, '0')}</div>
                                     <div style="font-size:0.72rem; color:var(--text-sub);">${dateStr}</div>
                                 </td>
-                                <td>
-                                    <div style="font-family:monospace; font-weight:800; color:var(--primary); letter-spacing:1px;">${t.token}</div>
-                                </td>
+                                <td>${tokenDisplay}</td>
                                 <td>
                                     <div style="font-weight:700;">${t.months} Bulan</div>
                                     <div style="font-size:0.75rem; color:var(--text-sub);">${formattedAmount}</div>
@@ -981,15 +1028,126 @@ $current_page = 'system_license.php';
                                 <td>${proofLink}</td>
                                 <td>${aiBadge}</td>
                                 <td>${statusBadge}</td>
+                                <td style="text-align: center;">${actionsHtml}</td>
                             </tr>
                         `;
                     }).join('');
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger); text-align:center;">${data.error || 'Gagal memuat token'}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--danger); text-align:center;">${data.error || 'Gagal memuat token'}</td></tr>`;
                 }
             } catch (err) {
                 console.error(err);
             }
+        }
+
+        let lastGeneratedToken = '';
+
+        async function approvePayment(id, email, months) {
+            if (!confirm(`Setujui bukti pembayaran untuk ${email} (${months} Bulan)?\n\nSistem akan menerbitkan Token Lisensi resmi dan mengirimkannya langsung ke email pembeli.`)) {
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('id', id);
+
+                const res = await fetch('./api.php?action=approve_payment_token', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    lastGeneratedToken = data.token;
+                    document.getElementById('tokenResultCode').textContent = data.token;
+                    document.getElementById('tokenResultDesc').innerHTML = `
+                        Token lisensi (<strong>${data.months} Bulan</strong>) telah berhasil diterbitkan!<br>
+                        Email aktivasi otomatis dikirimkan ke: <strong>${data.email}</strong>.
+                    `;
+
+                    const waText = encodeURIComponent(`Halo, pembayaran lisensi TMS Anda (${data.months} Bulan) telah disetujui! Berikut adalah Token Aktivasi Anda:\n\n*${data.token}*\n\nSilakan masukkan token ini pada halaman sistem untuk mengaktifkan kembali.`);
+                    document.getElementById('btnShareWa').href = `https://wa.me/?text=${waText}`;
+
+                    document.getElementById('tokenResultModal').style.display = 'flex';
+                    fetchLicenseTokens();
+                    fetchLicenseLogs();
+                } else {
+                    showToast(data.error || 'Gagal menyetujui pembayaran', 'error');
+                }
+            } catch (err) {
+                showToast('Gangguan jaringan ke server', 'error');
+            }
+        }
+
+        async function rejectPayment(id) {
+            if (!confirm('Apakah Anda yakin ingin MENOLAK bukti pembayaran ini?')) {
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('id', id);
+
+                const res = await fetch('./api.php?action=reject_payment_token', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Bukti pembayaran ditolak.', 'info');
+                    fetchLicenseTokens();
+                } else {
+                    showToast(data.error || 'Gagal menolak pembayaran', 'error');
+                }
+            } catch (err) {
+                showToast('Gangguan jaringan ke server', 'error');
+            }
+        }
+
+        async function resendTokenEmail(id) {
+            if (!confirm('Kirim ulang email token aktivasi ke pembeli?')) return;
+            try {
+                const formData = new FormData();
+                formData.append('id', id);
+                const res = await fetch('./api.php?action=resend_token_email', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.error || 'Gagal mengirim ulang email', 'error');
+                }
+            } catch (err) {
+                showToast('Gangguan jaringan', 'error');
+            }
+        }
+
+        async function confirmRevokeLicense() {
+            const reason = prompt('PERINGATAN KERAS:\nApakah Anda yakin ingin membatalkan/mengunci pemakaian sistem sekarang?\n\nSistem akan langsung berstatus EXPIRED dan seluruh staf/driver akan dialihkan ke halaman Expired.\n\nKetik "BATALKAN" (huruf besar) untuk melanjutkan:');
+            
+            if (reason !== 'BATALKAN') {
+                if (reason !== null) alert('Konfirmasi dibatalkan (kata kunci tidak cocok).');
+                return;
+            }
+
+            try {
+                const res = await fetch('./api.php?action=revoke_system_license', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    fetchLicenseData();
+                    fetchLicenseLogs();
+                } else {
+                    alert(data.error || 'Gagal membatalkan lisensi.');
+                }
+            } catch (err) {
+                alert('Gangguan koneksi ke server.');
+            }
+        }
+
+        function copyTokenResult() {
+            if (lastGeneratedToken) {
+                copyText(lastGeneratedToken, 'Kode token berhasil disalin!');
+            }
+        }
+
+        function closeTokenResultModal() {
+            document.getElementById('tokenResultModal').style.display = 'none';
         }
 
         document.getElementById('paymentConfigForm').onsubmit = async (e) => {
@@ -1046,6 +1204,35 @@ $current_page = 'system_license.php';
             fetchLicenseTokens();
         });
     </script>
+    <!-- MODAL HASIL GENERATE TOKEN ADMIN -->
+    <div id="tokenResultModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.85); z-index:9999; align-items:center; justify-content:center; padding:1rem; backdrop-filter:blur(5px);">
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:24px; max-width:480px; width:100%; padding:2.25rem 2rem; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.6); color:#ffffff;">
+            <div style="width:68px; height:68px; background:rgba(16,185,129,0.15); border:2px solid rgba(16,185,129,0.4); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#10b981; margin-bottom:1.25rem;">
+                <span class="material-symbols-outlined" style="font-size:38px;">key</span>
+            </div>
+            <h3 style="font-size:1.35rem; font-weight:800; margin-bottom:6px;">Token Lisensi Berhasil Diterbitkan!</h3>
+            <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:1.25rem; line-height:1.5;" id="tokenResultDesc">
+                Token lisensi telah diterbitkan dan otomatis dikirimkan ke email pembeli.
+            </p>
+            <div style="background:#0f172a; border:1.5px dashed #4f46e5; border-radius:14px; padding:1.25rem; margin-bottom:1.5rem;">
+                <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase; margin-bottom:6px;">KODE TOKEN AKTIVASI:</div>
+                <div id="tokenResultCode" style="font-family:monospace; font-size:1.5rem; font-weight:800; color:#818cf8; letter-spacing:2px;">TMS-XXXX-XXXX-XXXX</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button type="button" onclick="copyTokenResult()" style="background:#4f46e5; color:#ffffff; border:none; padding:12px 16px; border-radius:12px; font-weight:700; font-size:0.9rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span class="material-symbols-outlined" style="font-size:20px;">content_copy</span>
+                    <span>Salin Kode Token</span>
+                </button>
+                <a id="btnShareWa" href="#" target="_blank" rel="noopener noreferrer" style="background:linear-gradient(135deg, #25D366, #128C7E); color:#ffffff; text-decoration:none; padding:12px 16px; border-radius:12px; font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <svg viewBox="0 0 24 24" style="width:20px; height:20px; fill:currentColor;"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.592 2.654-.696c1.001.574 1.761.855 2.806.855 3.18 0 5.767-2.587 5.767-5.766.001-3.18-2.585-5.768-5.767-5.768zm3.376 8.204c-.149.418-.752.793-1.042.845-.275.048-.624.088-1.795-.398-1.503-.623-2.473-2.15-2.548-2.25-.075-.101-.611-.813-.611-1.549 0-.736.386-1.098.523-1.248.137-.149.3-.187.4-.187.1 0 .2 0 .287.005.093.004.218-.035.341.261.129.308.439 1.07.478 1.149.039.078.064.17.014.27-.05.099-.075.161-.149.248-.075.086-.157.193-.224.259-.075.074-.153.155-.066.304.087.149.387.639.83 1.033.57.507 1.05.664 1.2.738.149.075.237.062.325-.038.087-.1.374-.436.474-.585.1-.149.2-.124.336-.074.137.05.868.409 1.018.484.149.075.249.112.286.174.037.063.037.362-.112.78zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.954-1.399C8.423 21.493 10.15 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+                    <span>Kirim Token ke WhatsApp Pembeli</span>
+                </a>
+                <button type="button" onclick="closeTokenResultModal()" style="background:transparent; color:#94a3b8; border:1px solid #334155; padding:10px 16px; border-radius:12px; font-weight:600; cursor:pointer; margin-top:2px;">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

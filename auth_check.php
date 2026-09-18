@@ -165,7 +165,7 @@ function ensureLicenseTablesExist($pdo) {
               `payment_proof` VARCHAR(255) NULL,
               `ai_status` VARCHAR(50) DEFAULT 'verified',
               `ai_analysis` TEXT NULL,
-              `status` ENUM('active', 'used', 'expired') DEFAULT 'active',
+              `status` VARCHAR(20) DEFAULT 'pending',
               `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
               `used_at` DATETIME NULL,
               `used_by_ip` VARCHAR(45) NULL
@@ -179,6 +179,11 @@ function ensureLicenseTablesExist($pdo) {
             ('payment_admin_email', 'dhanielo.marthinz@gmail.com')
             ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
         ");
+
+        try {
+            @$pdo->exec("ALTER TABLE `system_license_tokens` MODIFY COLUMN `status` VARCHAR(20) DEFAULT 'pending'");
+        } catch (Exception $e) {}
+
         $checked = true;
     } catch (Exception $e) {}
 }

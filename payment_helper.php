@@ -506,8 +506,9 @@ function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $pro
     $aiEngine = htmlspecialchars($aiResult['details']['engine'] ?? 'AI Verification Engine');
 
     $badgeColor = ($aiStatus === 'verified') ? '#10b981' : '#f59e0b';
+    $licenseDashboardUrl = $baseUrl . "/system_license";
 
-    $subject = "[PEMBAYARAN MASUK] Lisensi TMS {$months} Bulan ({$formattedAmount}) - Oleh {$userEmail}";
+    $subject = "[BUKTI TRANSFER MASUK - MENUNGGU VERIFIKASI] Lisensi TMS {$months} Bulan ({$formattedAmount}) - Oleh {$userEmail}";
 
     $htmlBody = <<<HTML
 <!DOCTYPE html>
@@ -517,26 +518,27 @@ function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $pro
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }
         .container { max-width: 650px; margin: 0 auto; background: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
-        .header { background: #0f172a; padding: 24px; border-bottom: 2px solid #4f46e5; }
+        .header { background: #0f172a; padding: 24px; border-bottom: 2px solid #6366f1; }
         .header h1 { margin: 0; font-size: 20px; color: #ffffff; }
         .body { padding: 24px; font-size: 14px; line-height: 1.6; }
         .card-ai { background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 12px; padding: 18px; margin: 20px 0; }
         .table { width: 100%; border-collapse: collapse; margin: 16px 0; }
         .table td { padding: 8px 0; border-bottom: 1px solid #334155; color: #cbd5e1; }
         .table td.val { font-weight: 700; color: #ffffff; text-align: right; }
-        .btn-view { display: inline-block; background: #4f46e5; color: #ffffff !important; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; }
+        .btn-view { display: inline-block; background: #334155; color: #ffffff !important; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; margin: 4px; }
+        .btn-approve { display: inline-block; background: #10b981; color: #ffffff !important; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 14px; margin: 6px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
         .footer { background: #0f172a; padding: 16px; text-align: center; font-size: 11px; color: #64748b; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Notifikasi Pembayaran & Bukti Transfer Masuk</h1>
+            <h1>Bukti Pembayaran Baru Menunggu Verifikasi Anda</h1>
             <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">Waktu Transaksi: {$timeNow}</p>
         </div>
         <div class="body">
             <p>Halo Administrator <strong>Dhanielo Marthinz</strong>,</p>
-            <p>Seorang pengguna telah melakukan pembayaran perpanjangan lisensi dan mengunggah bukti transfer ke sistem TMS Head Office.</p>
+            <p>Seorang pengguna telah mengunggah bukti transfer pembayaran perpanjangan lisensi sistem TMS Head Office. <strong>Token aktivasi belum dikirimkan ke pembeli</strong> menunggu pengecekan dan persetujuan Anda.</p>
 
             <table class="table">
                 <tr>
@@ -552,14 +554,14 @@ function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $pro
                     <td class="val">{$formattedAmount}</td>
                 </tr>
                 <tr>
-                    <td>Token Diterbitkan</td>
-                    <td class="val" style="color: #818cf8; font-family: monospace;">{$token}</td>
+                    <td>Status Permintaan</td>
+                    <td class="val" style="color: #f59e0b;">MENUNGGU VERIFIKASI ADMIN</td>
                 </tr>
             </table>
 
             <div class="card-ai">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <span style="font-weight: 800; font-size: 13px; color: #94a3b8; text-transform: uppercase;">HASIL VERIFIKASI AI</span>
+                    <span style="font-weight: 800; font-size: 13px; color: #94a3b8; text-transform: uppercase;">HASIL ANALISIS AWAL AI</span>
                     <span style="background: {$badgeColor}; color: #ffffff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">{$aiStatus} ({$aiConfidence}%)</span>
                 </div>
                 <div style="font-size: 13px; color: #e2e8f0; margin-bottom: 8px;"><strong>Engine:</strong> {$aiEngine}</div>
@@ -567,12 +569,19 @@ function sendProofNotificationToAdmin($userEmail, $token, $months, $amount, $pro
             </div>
 
             <div style="text-align: center; margin: 24px 0;">
-                <a href="{$proofUrl}" target="_blank" class="btn-view">Lihat File Bukti Transfer</a>
-                <p style="font-size: 12px; color: #94a3b8; margin-top: 8px;">File bukti juga tersimpan di server: <code>uploads/payments/{$proofFileName}</code></p>
+                <div style="margin-bottom: 12px;">
+                    <a href="{$proofUrl}" target="_blank" class="btn-view">Lihat File Bukti Transfer</a>
+                </div>
+                <div>
+                    <a href="{$licenseDashboardUrl}" target="_blank" class="btn-approve">Buka Menu Lisensi & Terbitkan Token</a>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 12px;">
+                    Setelah memeriksa struk di atas, buka menu <strong>Lisensi System</strong> lalu klik tombol <strong>"Setujui & Generate Token"</strong>. Sistem akan otomatis menerbitkan token dan mengirimkannya langsung ke email pembeli (<strong>{$userEmail}</strong>).
+                </p>
             </div>
         </div>
         <div class="footer">
-            TMS Head Office Automated Financial Verification Engine &copy; <?php echo date('Y'); ?>
+            TMS Head Office Operations System &copy; <?php echo date('Y'); ?>
         </div>
     </div>
 </body>
